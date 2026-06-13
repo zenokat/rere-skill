@@ -16,7 +16,13 @@ def normalize_scalar(value: Any, digits: int = 2) -> Any:
         return None
     if isinstance(value, str):
         stripped = value.strip()
-        return stripped if stripped else None
+        if not stripped:
+            return None
+        parsed_numeric = _try_parse_decimal(stripped)
+        if parsed_numeric is not None:
+            quantized = parsed_numeric.quantize(Decimal("1." + "0" * digits), rounding=ROUND_HALF_UP)
+            return float(quantized)
+        return stripped
     if isinstance(value, bool):
         return value
     if isinstance(value, (int, float, Decimal)):
@@ -30,3 +36,14 @@ def normalize_record(record: dict[str, Any], digits: int = 2) -> dict[str, Any]:
 
     return {key: normalize_scalar(value, digits=digits) for key, value in record.items()}
 
+
+def _try_parse_decimal(value: str) -> Decimal | None:
+    """尝试把纯数字字符串解析成 Decimal。"""
+
+    candidate = value.replace(",", "")
+    if not candidate:
+        return None
+    try:
+        return Decimal(candidate)
+    except Exception:  # noqa: BLE001
+        return None

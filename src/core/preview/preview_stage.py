@@ -171,7 +171,8 @@ class PreviewStageImpl:
             )
 
         records = list(aggregates.values())
-        ordered_records = self._order_records(records=records, group_fields=group_fields, sum_rules=sum_rules)
+        normalized_records = self._normalize_and_merge_group_records(records, group_fields)
+        ordered_records = self._order_records(records=normalized_records, group_fields=group_fields, sum_rules=sum_rules)
         artifact = self._artifact_writer.write(recog_id=recog_id, period=period, records=ordered_records, group_fields=group_fields)
         return PreviewSuccessResponse(
             recog_id=recog_id,
@@ -291,3 +292,52 @@ class PreviewStageImpl:
                 ordered_record[sum_field_name] = round(float(record.get(sum_field_name, 0.0)), 2)
             ordered_records.append(ordered_record)
         return ordered_records
+
+    @staticmethod
+    def _fill_missing_group_values(records: list[dict[str, Any]], group_fields: list[str]) -> None:
+        """用同源唯一候选回填缺失的 GROUP 值。"""
+
+        for target_field in group_fields:
+            other_group_fields = [field_name for field_name in group_fields if field_name != target_field]
+            if target_field == "平台ID":
+                prioritized_fields = [field_name for field_name in ["平台门店名称", "来源文件"] if field_name in other_group_fields]
+                other_group_fields = prioritized_fields + [field_name for field_name in other_group_fields if field_name not in prioritized_fields]
+            candidates_by_group: dict[tuple[Any, ...], set[Any]] = {}
+
+            for record in records:
+                candidate_value = record.get(target_field)
+                if candidate_value in (None, ""):
+                    continue
+                group_key = tuple(record.get(field_name) for field_name in other_group_fields)
+                candidates_by_group.setdefault(group_key, set()).add(candidate_value)
+
+            for record in records:
+                if record.get(target_field) not in (None, ""):
+                    continue
+                group_key = tuple(record.get(field_name) for field_name in other_group_fields)
+                candidates = candidates_by_group.get(group_key, set())
+                if len(candidates) == 1:
+                    record[target_field] = next(iter(candidates))
+
+    @classmethod
+    def _normalize_and_merge_group_records(cls, records: list[dict[str, Any]], group_fields: list[str]) -> list[dict[str, Any]]:
+        """回填缺失 GROUP 值后，重新按联合键合并记录。"""
+
+        cls._fill_missing_group_values(records, group_fields)
+        merged_records: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
+
+        for record in records:
+            group_key = tuple(record.get(field_name) for field_name in group_fields)
+            current = merged_records.get(group_key)
+            if current is None:
+                merged_records[group_key] = dict(record)
+                continue
+
+            for field_name, value in record.items():
+                if field_name == PERIOD_FIELD_NAME or field_name in group_fields:
+                    if current.get(field_name) in (None, "") and value not in (None, ""):
+                        current[field_name] = value
+                    continue
+                current[field_name] = float(current.get(field_name, 0.0)) + float(value or 0.0)
+
+        return list(merged_records.values())

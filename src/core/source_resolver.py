@@ -22,6 +22,7 @@ STREAMING_WORKBOOK_SIZE_THRESHOLD = 10 * 1024 * 1024
 DataRow = dict[tuple[str, str], Any]
 DataRowIteratorFactory = Callable[[], Iterator[tuple[int, DataRow]]]
 TEMPORARY_SOURCE_PREFIXES = ("~$",)
+FILE_NAME_VIRTUAL_FIELD = "FILE_NAME"
 
 
 @dataclass(frozen=True)
@@ -118,7 +119,7 @@ class SourceFileLoadCache:
         raw_rows = self.csv_rows_by_file.get(source_file)
         if raw_rows is None:
             with source_file.open("r", encoding="utf-8-sig", newline="") as handle:
-                raw_rows = [list(row) for row in csv.reader(handle)]
+                raw_rows = [list(row) for row in csv.reader(handle) if any(cell.strip() for cell in row if isinstance(cell, str))]
             self.csv_rows_by_file[source_file] = raw_rows
         return raw_rows, DEFAULT_LOGICAL_SHEET
 
@@ -256,6 +257,7 @@ def build_sheet_dataset(
         row_values = _build_row_value_map(
             row_values=raw_rows[row_number - 1],
             columns=columns,
+            source_file=source_file,
         )
         data_rows.append(row_values)
         data_row_numbers.append(row_number)
@@ -322,7 +324,11 @@ def _build_streaming_sheet_dataset(source_file: Path, spec: SourceSheetSpec) -> 
             worksheet.iter_rows(min_row=data_start_row, max_row=data_start_row, values_only=True),
             None,
         )
-        first_data_row = _build_row_value_map(row_values=first_raw_row, columns=columns) if first_raw_row is not None else None
+        first_data_row = (
+            _build_row_value_map(row_values=first_raw_row, columns=columns, source_file=source_file)
+            if first_raw_row is not None
+            else None
+        )
     finally:
         workbook.close()
 
@@ -382,7 +388,7 @@ def _build_streaming_sheet_dataset_to_end(source_file: Path, spec: SourceSheetSp
         if first_raw_row is None:
             raise ValueError("The data range is empty after applying category_row, field_row, and last_row.")
 
-        first_data_row = _build_row_value_map(row_values=first_raw_row, columns=columns)
+        first_data_row = _build_row_value_map(row_values=first_raw_row, columns=columns, source_file=source_file)
     finally:
         workbook.close()
 
@@ -449,7 +455,7 @@ def _load_raw_rows(
         if logical_sheet != DEFAULT_LOGICAL_SHEET:
             raise ValueError("CSV files must use the DEFAULT logical sheet.")
         with source_file.open("r", encoding="utf-8-sig", newline="") as handle:
-            return [list(row) for row in csv.reader(handle)], DEFAULT_LOGICAL_SHEET
+            return [list(row) for row in csv.reader(handle) if any(cell.strip() for cell in row if isinstance(cell, str))], DEFAULT_LOGICAL_SHEET
 
     snapshot = _build_workbook_snapshot(source_file)
     return snapshot.resolve_rows(logical_sheet)
@@ -584,6 +590,7 @@ def _build_column_descriptors(
         seen_columns.setdefault(key, []).append(column_index + 1)
         columns.append(ColumnDescriptor(column_index=column_index, category=category, field=field))
 
+    _append_virtual_file_name_column(columns=columns, seen_columns=seen_columns)
     duplicate_columns = {key: indices for key, indices in seen_columns.items() if len(indices) > 1}
     return columns, duplicate_columns
 
@@ -592,15 +599,18 @@ def _build_row_value_map(
     *,
     row_values: tuple[Any, ...] | list[Any] | None,
     columns: list[ColumnDescriptor],
+    source_file: Path | None = None,
 ) -> DataRow:
     """将单行二维表数据映射成规则引擎可消费的字典。"""
 
     normalized_row = list(row_values) if row_values is not None else []
     mapped_row: DataRow = {}
     for column in columns:
-        mapped_row[(column.category or "", column.field)] = (
-            normalized_row[column.column_index] if column.column_index < len(normalized_row) else None
-        )
+        if column.column_index < 0 and column.field == FILE_NAME_VIRTUAL_FIELD:
+            mapped_row[(column.category or "", column.field)] = source_file.stem if source_file is not None else None
+            continue
+        raw_value = normalized_row[column.column_index] if column.column_index < len(normalized_row) else None
+        mapped_row[(column.category or "", column.field)] = _normalize_source_cell_value(raw_value)
     return mapped_row
 
 
@@ -624,7 +634,7 @@ def _iter_workbook_sheet_rows(
             worksheet.iter_rows(min_row=data_start_row, max_row=resolved_last_row, values_only=True),
             start=data_start_row,
         ):
-            yield row_number, _build_row_value_map(row_values=row_values, columns=columns)
+            yield row_number, _build_row_value_map(row_values=row_values, columns=columns, source_file=source_file)
     finally:
         workbook.close()
 
@@ -648,7 +658,7 @@ def _iter_workbook_sheet_rows_to_end(
             worksheet.iter_rows(min_row=data_start_row, values_only=True),
             start=data_start_row,
         ):
-            yield row_number, _build_row_value_map(row_values=row_values, columns=columns)
+            yield row_number, _build_row_value_map(row_values=row_values, columns=columns, source_file=source_file)
     finally:
         workbook.close()
 
@@ -698,3 +708,25 @@ def _build_merged_value_map(worksheet) -> dict[tuple[int, int], Any]:
             for column_index in range(merged_range.min_col, merged_range.max_col + 1):
                 merged_value_map[(row_index, column_index)] = top_left_value
     return merged_value_map
+
+
+def _append_virtual_file_name_column(
+    *,
+    columns: list[ColumnDescriptor],
+    seen_columns: dict[tuple[str, str], list[int]],
+) -> None:
+    """追加内建的来源文件虚拟列。"""
+
+    key = ("", FILE_NAME_VIRTUAL_FIELD)
+    if key in seen_columns:
+        return
+    seen_columns[key] = [-1]
+    columns.append(ColumnDescriptor(column_index=-1, category=None, field=FILE_NAME_VIRTUAL_FIELD))
+
+
+def _normalize_source_cell_value(value: Any) -> Any:
+    """清理常见的源文件文本噪音。"""
+
+    if isinstance(value, str):
+        return value.lstrip("`")
+    return value

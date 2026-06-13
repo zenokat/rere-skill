@@ -35,7 +35,7 @@ PERIOD_FIELD_NAME = "期间"
 
 # 数值 / 文本类型做宽松推断，避免把飞书字段配置细节硬编码成过度刚性的规则。
 NUMERIC_FIELD_TYPES = {2}
-TEXTUAL_FIELD_TYPES = {1}
+TEXTUAL_FIELD_TYPES = {1, 3}
 PERIOD_ALLOWED_FIELD_TYPES = {1, 2}
 
 

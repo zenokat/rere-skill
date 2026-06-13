@@ -237,7 +237,7 @@ def coerce_numeric_value(rule: RollupRule, value: Any) -> float:
     if isinstance(value, (int, float)):
         return float(value)
 
-    normalized = str(value).replace(",", "").strip()
+    normalized = _normalize_numeric_text(value)
     if not normalized:
         if rule.optional:
             return 0.0
@@ -265,13 +265,19 @@ def as_number(value: Any) -> float | None:
     if isinstance(value, (int, float, Decimal)):
         return float(value)
 
-    normalized = str(value).replace(",", "").strip()
+    normalized = _normalize_numeric_text(value)
     if not normalized:
         return None
     try:
         return float(Decimal(normalized))
     except (InvalidOperation, ValueError) as exc:
         raise ValueError(f"Cannot convert value to number: {value!r}") from exc
+
+
+def _normalize_numeric_text(value: Any) -> str:
+    """规范化常见财务文本数值格式。"""
+
+    return str(value).replace(",", "").replace("`", "").strip()
 
 
 def period_of(value: Any) -> str | None:

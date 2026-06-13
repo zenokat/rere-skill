@@ -10,7 +10,17 @@ at specs/001-revenue-rollup-cli/plan.md
 
 ## 环境记忆
 请在开发过程中将遇到的任何多次尝试才成功的环境、工具交互经验固化在 `environment.md` ，避免屡次碰壁。
-（如：飞书API的调用格式，读取中文文档使用UTF-8转义，调用飞书API填值时shell传中文出现编码丢失问题需要ASCII Unicode码转义等）
+### 应该记什么
+`environment.md` 只记录“跨多轮迭代、跨多个任务仍会反复遇到”的通用环境或工具交互经验，例如：
+- shell / PowerShell / heredoc 的编码、转义、参数传递、代理继承问题；
+- 本地运行环境、权限、白名单、网络、路径、临时目录等带来的稳定约束；
+- 第三方平台或外部工具在“如何调用”层面的通用坑位与稳定做法。
+### 不要记什么
+以下内容不要记入 `environment.md`：
+- 某个 `recog_id`、某份样本数据、某个目录、某张表、某次对账的项目特例；
+- 已经被源码吸收并有测试覆盖的实现细节，除非仍需要保留一条“如何与环境交互”的操作约束；
+- 业务规则、字段语义、聚合口径、上传键规则、预处理规则等项目逻辑。
+
 
 ### 命令调用方式
 
@@ -24,3 +34,6 @@ at specs/001-revenue-rollup-cli/plan.md
   `.\.codex\scripts\rere.cmd run_recog_rollup --preview --recog_id <recog_id> --period <period> --source_file <source_file>`
 
   `.\.codex\scripts\rere.cmd run_recog_rollup --upload --append|--upsert --recog_id <recog_id> --result_file <result_file>`
+
+## git提交要求
+- 使用中文

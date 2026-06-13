@@ -55,6 +55,19 @@ class _FakeBitableClient:
         ]
 
 
+class _SingleSelectGroupBitableClient:
+    """模拟 GROUP 目标字段为飞书单选类型。"""
+
+    def list_fields(self, app_token: str, table_id: str) -> list[dict[str, object]]:
+        """返回单选 GROUP 字段。"""
+
+        return [
+            {"field_name": "期间", "type": 2},
+            {"field_name": "门店", "type": 3},
+            {"field_name": "已结算金额", "type": 2},
+        ]
+
+
 class _FakeSettings:
     """只暴露 ValidateStageImpl 依赖的配置字段。"""
 
@@ -126,3 +139,62 @@ def test_validate_stage_reports_condition_placeholder_with_structured_code() -> 
     assert len(condition_failures) == 1
     assert condition_failures[0]["scope"] == "rule:已结算金额"
     assert condition_failures[0]["details"][0]["code"] == "condition_placeholder_detected"
+
+
+def test_validate_stage_accepts_single_select_group_target_field() -> None:
+    """GROUP 字段映射到飞书单选列时应视为兼容。"""
+
+    tmp_dir = Path.cwd() / "tests" / "_tmp_validate_stage" / uuid4().hex
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    source_file = tmp_dir / "source.csv"
+    source_file.write_text(
+        "门店,金额\n"
+        "华北一店,100\n",
+        encoding="utf-8",
+    )
+
+    bundle = RuleBundle(
+        recog_id="demo_recog",
+        source_sheets=[
+            SourceSheetSpec(
+                recog_id="demo_recog",
+                sheet="DEFAULT",
+                field_row=1,
+                last_row=-1,
+            )
+        ],
+        rollup_rules=[
+            RollupRule(
+                recog_id="demo_recog",
+                bitable_field="门店",
+                type="GROUP",
+                sheet="DEFAULT",
+                field="门店",
+            ),
+            RollupRule(
+                recog_id="demo_recog",
+                bitable_field="已结算金额",
+                type="SUM",
+                sheet="DEFAULT",
+                field="金额",
+            ),
+        ],
+    )
+
+    service = ValidateStageImpl(
+        catalog_repository=_FakeCatalogRepository(
+            RecognitionProject(
+                recog_id="demo_recog",
+                recog_name="演示项目",
+                bitable_table_id="tbl-demo",
+                bitable_table_exists=True,
+            )
+        ),
+        rule_repository=_FakeRuleRepository(bundle),
+        bitable_client=_SingleSelectGroupBitableClient(),
+        settings=_FakeSettings(),  # type: ignore[arg-type]
+    )
+
+    response = service.run("demo_recog", source_file)
+
+    assert response.error_count == 0

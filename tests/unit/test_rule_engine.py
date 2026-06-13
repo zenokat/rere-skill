@@ -131,3 +131,18 @@ def test_coerce_numeric_value_returns_zero_for_optional_empty_sum() -> None:
     )
 
     assert coerce_numeric_value(rule, "") == 0.0
+
+
+def test_coerce_numeric_value_accepts_backtick_prefixed_numeric_string() -> None:
+    """CSV 中带前缀反引号的数字文本应能被正确解析。"""
+
+    rule = RollupRule(
+        recog_id="wechat_pay_settlement",
+        bitable_field="订单金额",
+        type="SUM",
+        sheet="DEFAULT",
+        field="订单金额",
+        optional=False,
+    )
+
+    assert coerce_numeric_value(rule, "`157.80") == 157.8
