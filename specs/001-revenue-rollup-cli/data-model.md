@@ -117,7 +117,7 @@
 
 ### HistoricalBaselineRecord
 
-表示一个用于校准的 202603 历史记录。
+表示一个用于校准的 202605 历史记录。
 
 | Field | Type | Description |
 |---|---|---|
@@ -125,21 +125,31 @@
 | `period` | string | 基线期间 |
 | `fields` | map | 归一化后的阶段一字段值 |
 
-### CoverageMatrixRow
+### IterationProjectSummary
 
-用于追踪每个项目在 Ralph 循环中的推进状态。
+用于概括某个项目在 Ralph 循环中的当前状态，对应 `iteration-progress.md` 中的总表。
 
 | Field | Type | Description |
 |---|---|---|
 | `recog_id` | string | 项目主键 |
 | `recog_name` | string | 项目名称 |
-| `source_ready` | boolean | 源文件是否已就绪 |
-| `history_ready` | boolean | 历史记录是否已具备 |
-| `validate_passed` | boolean | 当前结构检验是否通过 |
-| `preview_matched` | boolean | 当前 preview 是否与基线一致 |
-| `diff_type` | string | 差异分类 |
-| `rule_delta` | string | 本轮新增规则或代码调整摘要 |
-| `regression_status` | string | 当前回归状态 |
+| `status` | string | 当前推进状态，仅使用 `working`、`matched`、`业务TBD`、`blocked` |
+| `last_round` | integer | 当前项目最近一轮编号 |
+| `next_action` | string | 下一步动作，或为什么应停止 |
+| `latest_delta` | string | 最近一轮新增改动摘要 |
+
+### IterationRecord
+
+用于记录某个项目的单轮迭代证据，对应 `iteration-progress.md` 中的项目小表。
+
+| Field | Type | Description |
+|---|---|---|
+| `recog_id` | string | 所属项目 |
+| `round` | integer | 当前项目内的轮次编号 |
+| `date` | date | 本轮记录日期 |
+| `result` | string | 本轮最关键的结果，用于判断是否继续当前项目、是否需要业务确认、是否可进入回归 |
+| `delta` | string | 本轮新增规则、代码补丁、文档调整或环境处理摘要 |
+| `notes` | string | 补充条数、耗时、阻断原因、下一步动作等关键信息 |
 
 ## Relationships
 
@@ -147,7 +157,8 @@
 - 一个 `RecognitionProject` 会关联多条 `RollupRule`
 - 一次 preview 运行会产生一个 `PreviewArtifact` 和零到多条 `PreviewIssue`
 - 一次 upload 运行会通过 `UploadRequest` 消费一个 `PreviewArtifact`
-- 一条 `CoverageMatrixRow` 用来概括一个 `RecognitionProject` 当前的校准状态
+- 一条 `IterationProjectSummary` 用来概括一个 `RecognitionProject` 当前的校准状态
+- 一个 `RecognitionProject` 会关联多条 `IterationRecord`
 
 ## State Flow
 
@@ -156,9 +167,10 @@ Listed
   -> Validated
   -> Previewed
   -> Baseline Matched
-  -> Upload Eligible
-  -> Uploaded
+  -> Regression Eligible
 
 Any stage can move to:
-  -> Blocked (requires rule, config, or code iteration)
+  -> Code Iteration
+  -> Business TBD
+  -> Blocked (requires external dependency or manual decision)
 ```

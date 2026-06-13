@@ -13,7 +13,7 @@
 
 ## Decision 2: 阶段一工具采用“薄 CLI + 核心引擎 + Feishu 适配层”
 
-- **Decision**: 保持 `list_recog_projects` 和 `run_recog_rollup` 作为薄入口，核心
+- **Decision**: 保持 `list_recog_items` 和 `run_recog_rollup` 作为薄入口，核心
   逻辑沉淀在可复用引擎中，Feishu Bitable 调用独立在适配层。
 - **Rationale**: 未来 skill 应只编排稳定工具，而不是承载业务逻辑。这种布局也
   更有利于单元测试和后续扩展。
@@ -21,10 +21,10 @@
   - 每个命令一个独立大脚本：起步快，但不适合多项目持续迭代。
   - 引入重型框架应用：结构过重，不符合当前本地 CLI 优先的场景。
 
-## Decision 3: 以 202603 源文件和历史记录建立黄金样本
+## Decision 3: 以 202605 源文件和历史记录建立黄金样本
 
-- **Decision**: 将本地 `202603-source-excel` 文件和来源于飞书业务数据库拷
-  贝镜像表的 202603 历史记录作为第一批黄金基线。
+- **Decision**: 将本地 `202605-source-excel` 文件和来源于飞书业务数据库拷
+  贝镜像表的 202605 历史记录作为第一批黄金基线。
 - **Rationale**: 这能把“看起来像对”转成“确实和历史结果一致”的明确 pass/fail
   机制，只有 `--preview` 输出与历史记录一致，项目才算校准通过。
 - **Alternatives considered**:
@@ -52,14 +52,31 @@
   - 纯配置实现：结构最干净，但规则表表达能力不足时会拖慢迭代。
   - 到处写项目特例代码：短期快，长期不可维护。
 
-## Decision 6: 结果文件作为 `--preview` 与 `--upload` 的边界产物
+## Decision 6: condition 首版采用受限表达式与少量内置 helper
+
+- **Decision**: condition 首版采用受限的单行布尔表达式方案，统一使用
+  `F("字段名")` 访问字段，并仅内置当前真实业务所需的少量 helper；首版不开放
+  Agent 自主创建或注册 helper。
+- **Rationale**: 当前确认项目中的条件汇总只涉及“按结算时间过滤”和“按单个可
+  枚举 GROUP 字段值过滤”两类场景，用最小能力集即可跑通主流程。若在首版就开放
+  自定义 helper，会把治理、注册、测试和边界控制复杂度提前引入主线开发。
+- **Alternatives considered**:
+  - 继续沿用宽松字段引用与自由 helper：短期更灵活，但安全边界和长期治理成本过高。
+  - 首版直接开放 Agent 自主扩展 helper：扩展性更强，但会显著增加实现和维护复杂度。
+
+**Related design note**: condition 的首版范围、`F("字段名")` 语义、内置 helper、
+后续自定义 helper 治理与 Agent fallback 边界，统一见
+[condition-expression-design.md](./condition-expression-design.md)。`research.md`
+仅保留这里的决策摘要，不重复展开 condition 细节。
+
+## Decision 7: 结果文件作为 `--preview` 与 `--upload` 的边界产物
 
 - **Decision**: 将 preview 生成的 Excel 文件视为正式边界产物，用于后续上传。
 - **Rationale**: 这符合产品设计，也有利于人工复核，并支持上传与重算解耦。
 - **Alternatives considered**:
   - 直接从内存中的 preview 数据上传：路径更短，但可追溯性差，也不利于独立重跑上传。
 
-## Decision 7: 用项目覆盖矩阵跟踪迭代，而不是频繁扩大大 spec
+## Decision 8: 用项目覆盖矩阵跟踪迭代，而不是频繁扩大大 spec
 
 - **Decision**: 用独立的项目覆盖矩阵记录项目校准进度，而不是不断把每个项目的
   细节塞进 `spec.md`。
@@ -68,7 +85,7 @@
   - 每个项目单独一份 spec：文档过碎。
   - 把所有项目细节都堆进主 spec：主 spec 会很快变脏、变噪。
 
-## Decision 8: preview 与 baseline 不一致时必须先汇报业务负责人
+## Decision 9: preview 与 baseline 不一致时必须先汇报业务负责人
 
 - **Decision**: 当 preview 结果与 baseline 不一致时，Agent 或开发实现不能
   依据自身判断直接推进规则迭代，必须先输出差异结果和判断建议，并等待业务负
@@ -79,7 +96,7 @@
   - 开发自行决定差异解释：速度更快，但业务偏差风险过高。
   - 每次只报告差异不附带建议：更保守，但会降低沟通效率。
 
-## Decision 9: 目录模式下 validate 采用抽样校验，preview 处理全部文件
+## Decision 10: 目录模式下 validate 采用抽样校验，preview 处理全部文件
 
 - **Decision**: `source_file` 支持单文件和目录两种输入，其中目录是多数项目的常态输入。
   当输入为目录时，`--validate` 只随机抽取一个代表文件做结构校验；`--preview` 再对目录

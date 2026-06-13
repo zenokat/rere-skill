@@ -53,21 +53,21 @@ description: "Task list for revenue recognition stage-one rollup implementation"
 
 ---
 
-## Phase 3: User Story 1 - Agent 调用 `list_recog_projects` 与 `run_recog_rollup` 完成端到端汇总 (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - Agent 调用 `list_recog_items` 与 `run_recog_rollup` 完成端到端汇总 (Priority: P1) 🎯 MVP
 
 **Goal**: 让 Agent 能先获取项目列表，再对一个已确认项目执行默认完整流程
 
-**Independent Test**: Agent 可以调用 `list_recog_projects` 获取项目清单，并成功调用 `run_recog_rollup --recog_id --period --source_file` 完成完整流程；若任一环节失败，工具能明确返回失败阶段
+**Independent Test**: Agent 可以调用 `list_recog_items` 获取项目清单，并成功调用 `run_recog_rollup --recog_id --period --source_file` 完成完整流程；若任一环节失败，工具能明确返回失败阶段
 
 ### Tests for User Story 1
 
-- [X] T012 [P] [US1] 在 `tests/contract/test_catalog_and_full_flow_cli.py` 中补充 `list_recog_projects` 与 `run_recog_rollup` 默认完整流程的 CLI 契约测试
+- [X] T012 [P] [US1] 在 `tests/contract/test_catalog_and_full_flow_cli.py` 中补充 `list_recog_items` 与 `run_recog_rollup` 默认完整流程的 CLI 契约测试
 - [ ] T013 [P] [US1] 在 `tests/integration/test_full_flow_wave1_smoke.py` 中补充一个首波项目对镜像表的完整流程冒烟测试
 
 ### Implementation for User Story 1
 
 - [X] T014 [P] [US1] 在 `src/core/catalog/list_projects_use_case.py` 中实现项目列表查询用例
-- [X] T015 [US1] 在 `src/cli/list_recog_projects.py` 中实现 `list_recog_projects` 命令
+- [X] T015 [US1] 在 `src/cli/list_recog_items.py` 中实现 `list_recog_items` 命令
 - [X] T016 [P] [US1] 在 `src/core/run_recog_rollup_service.py` 中实现 `validate -> preview -> upload` 的完整流程编排器
 - [X] T017 [US1] 在 `src/cli/run_recog_rollup.py` 中实现 `run_recog_rollup` 默认模式的参数解析与分发
 - [X] T018 [US1] 在 `src/core/run_recog_rollup_service.py` 中加入目标表可用性闸门与失败即停止的流程控制
@@ -78,9 +78,10 @@ description: "Task list for revenue recognition stage-one rollup implementation"
 
 ## Phase 4: User Story 2 - Agent 使用 `run_recog_rollup --validate` 与 `--preview` 完成复杂汇总 (Priority: P2)
 
-**Goal**: 让 Agent 能稳定执行结构检验、复杂规则试算以及 preview/baseline 对账
+**Goal**: 让 Agent 能稳定执行结构检验、复杂规则试算以及 preview/baseline 对账。
+首版 condition 范围收敛为两类真实已出现条件汇总：按结算时间过滤，以及按单个可枚举 `GROUP` 字段值过滤。
 
-**Independent Test**: Agent 可先执行 `--validate` 获得逐项校验结果，目录模式下只抽检一个代表文件；再执行 `--preview` 对全部匹配源文件完成试算，得到结果文件与概览，并能将输出与 202603 baseline 进行差异对比
+**Independent Test**: Agent 可先执行 `--validate` 获得逐项校验结果，目录模式下只抽检一个代表文件；再执行 `--preview` 对全部匹配源文件完成试算，得到结果文件与概览，并能将输出与 202605 baseline 进行差异对比
 
 ### Tests for User Story 2
 
@@ -95,7 +96,7 @@ description: "Task list for revenue recognition stage-one rollup implementation"
 - [X] T024 [US2] 在 `src/core/preview/preview_artifact_writer.py` 中实现 preview 结果文件写入器与结果摘要构建
 - [X] T025 [US2] 在 `tests/helpers/baseline_diff.py` 中实现 baseline 差异报告器与差异分类辅助逻辑
 - [X] T026 [US2] 在 `src/cli/run_recog_rollup.py` 中接入 `--validate` 与 `--preview` 模式
-- [X] T027 [US2] 在 `tests/helpers/baseline_diff.py` 与 `specs/001-revenue-rollup-cli/project-coverage-matrix.md` 中实现“差异必须先汇报再继续迭代”的流程支持
+- [X] T027 [US2] 在 `tests/helpers/baseline_diff.py` 与 `specs/001-revenue-rollup-cli/iteration-progress.md` 中实现“差异必须先汇报再继续迭代”的流程支持
 
 **Checkpoint**: User Story 2 should let Agent validate, preview, diff, and stop for business confirmation before continuing iteration
 
@@ -131,7 +132,8 @@ description: "Task list for revenue recognition stage-one rollup implementation"
 - [X] T035 [P] 在 `tests/unit/test_output_paths.py` 与 `tests/unit/test_project_patches.py` 中补充输出路径辅助函数与项目补丁注册器的单元测试
 - [X] T036 [P] 在 `tests/unit/test_rule_engine.py` 与 `tests/unit/test_normalizers.py` 中补充 condition 求值与归一化工具的单元测试
 - [ ] T037 在 `docs/feishu_bitable_api_notes.md` 与 `specs/001-revenue-rollup-cli/quickstart.md` 中更新镜像表上传与业务确认闸门的开发说明
-- [ ] T038 运行首波 quickstart 验证并更新 `specs/001-revenue-rollup-cli/project-coverage-matrix.md`
+- [ ] T038 运行首波 quickstart 验证并更新 `specs/001-revenue-rollup-cli/iteration-progress.md`
+- [ ] T039 在 `specs/001-revenue-rollup-cli/validate-output-contract.md` 与 `tests/contract/test_validate_preview_cli.py` 中补充“超出首版 condition 能力边界时返回明确错误并提示联系开发者扩展”的契约约束
 
 ---
 
@@ -193,12 +195,12 @@ Task: "Implement condition evaluation and optional field handling in src/core/ru
 1. 先交付工具骨架和完整流程
 2. 再交付 `--validate` 和 `--preview`，建立 preview/baseline 对账循环
 3. 再交付 `--upload`、`--append`、`--upsert`
-4. 每通过一个项目，就更新 coverage matrix 并纳入回归集合
+4. 当前项目对账通过后，再更新 `iteration-progress.md` 并纳入回归集合
 
 ### Ralph Loop Delivery
 
 1. 先完成首波 2 到 3 个代表性项目的校准
-2. 对每个项目执行 `list -> validate -> preview -> compare -> confirm -> regress`
+2. 对每个项目执行 `list -> validate -> preview -> compare -> confirm -> fix current project -> regress passed projects`
 3. 不一致时先汇报产品负责人，再决定是补规则、补配置还是修代码
 4. 项目波次滚动推进，避免一次覆盖全部 10+ 项目
 
@@ -207,6 +209,7 @@ Task: "Implement condition evaluation and optional field handling in src/core/ru
 ## Notes
 
 - `run_recog_rollup` 的三种单环节模式与两种强制上传策略都已拆成独立子任务
-- `project-coverage-matrix.md` 是 Ralph 内层循环的运营看板，不是装饰文档
+- `quickstart.md` 是 Ralph 内层循环的操作指南，不是一次性试用说明
+- `iteration-progress.md` 是 Ralph 内层循环的证据与状态记录，不是装饰文档
 - 任何会影响规则解释的差异都不能由实现层自行拍板
-- 开发阶段优先使用飞书业务数据库拷贝镜像表验证 upload
+- 内层迭代循环只针对 preview/baseline 对账；upload 是独立验证动作

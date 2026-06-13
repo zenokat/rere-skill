@@ -10,10 +10,10 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Agent 调用 `list_recog_projects` 与 `run_recog_rollup` 完成端到端汇总 (Priority: P1)
+### User Story 1 - Agent 调用 `list_recog_items` 与 `run_recog_rollup` 完成端到端汇总 (Priority: P1)
 
 作为任务执行方的 Agent，在接收到人类同事给出的确认项目、期间和源文件后，
-需要先调用 `list_recog_projects` 获取注册项目列表，并查看每个项目对应的
+需要先调用 `list_recog_items` 获取注册项目列表，并查看每个项目对应的
 `bitable_table_id` 是否存在；在完成目标项目判断后，再调用
 `run_recog_rollup --recog_id --period --source_file` 执行完整汇总流程。通过这
 种方式，Agent 可以把阶段一的汇总结果直接上传到飞书多维表，供人类同事继续
@@ -24,7 +24,7 @@
 起来，这个项目就还不能算作真正可用的 Agent 工具能力。
 
 **Independent Test**: 给定一条来自人类同事的任务指令，其中包含确认项目、
-期间和合法源文件。Agent 先调用 `list_recog_projects` 获取完整注册项目列
+期间和合法源文件。Agent 先调用 `list_recog_items` 获取完整注册项目列
 表，再判断出正确的 `recog_id` 并将其作为 `recog_id` 传入
 `run_recog_rollup`。测试通过的标志是：Agent 能输出清晰的执行结论，人类同
 事能在目标飞书数据表中直接看到该期间的阶段一汇总结果；若任一环节失败，
@@ -32,8 +32,8 @@ Agent 能获得工具返回的明确失败阶段和下一步行动依据。
 
 **Acceptance Scenarios**:
 
-1. **Given** Agent 接收到的人类指令包含有效的确认项目、期间和源文件，且 `list_recog_projects` 返回的注册项目列表中存在明确对应项并显示目标 `bitable_table_id` 可用，**When** Agent 先调用 `list_recog_projects` 完成项目匹配判断，再调用 `run_recog_rollup --recog_id --period --source_file`，**Then** 系统完成结构检验、试算和上传，并让人类同事在目标飞书数据表中直接看到处理结果。
-2. **Given** Agent 已调用 `list_recog_projects` 并拿到注册项目列表，但无法从中判断出唯一可信的目标项目，或返回结果显示目标 `bitable_table_id` 不可用，**When** Agent 完成项目判断阶段，**Then** Agent 不调用 `run_recog_rollup`，而是向人类同事返回待澄清或阻断信息。
+1. **Given** Agent 接收到的人类指令包含有效的确认项目、期间和源文件，且 `list_recog_items` 返回的注册项目列表中存在明确对应项并显示目标 `bitable_table_id` 可用，**When** Agent 先调用 `list_recog_items` 完成项目匹配判断，再调用 `run_recog_rollup --recog_id --period --source_file`，**Then** 系统完成结构检验、试算和上传，并让人类同事在目标飞书数据表中直接看到处理结果。
+2. **Given** Agent 已调用 `list_recog_items` 并拿到注册项目列表，但无法从中判断出唯一可信的目标项目，或返回结果显示目标 `bitable_table_id` 不可用，**When** Agent 完成项目判断阶段，**Then** Agent 不调用 `run_recog_rollup`，而是向人类同事返回待澄清或阻断信息。
 3. **Given** `run_recog_rollup` 在默认完整流程中的结构检验、试算或上传任一环节发生异常，**When** Agent 调用 `run_recog_rollup --recog_id --period --source_file`，**Then** 工具返回明确的失败环节和失败原因，且 Agent 基于该结果停止错误后续操作。
 
 ---
@@ -93,7 +93,7 @@ SUM、条件表达式以及 optional 标记的规则。Agent 先调用
 
 ### Edge Cases
 
-- `list_recog_projects` 返回的注册项目中，目标项目存在多个相似名称时，Agent
+- `list_recog_items` 返回的注册项目中，目标项目存在多个相似名称时，Agent
   应如何判断需要澄清而不是继续调用 `run_recog_rollup`？
 - 注册项目存在，但 `bitable_table_id` 缺失或对应飞书数据表不存在时，Agent
   是否应直接阻断完整流程？
@@ -114,10 +114,10 @@ SUM、条件表达式以及 optional 标记的规则。Agent 先调用
 
 ### Functional Requirements
 
-- **FR-001**: 系统 MUST 提供可通过 bash 以 CLI 方式调用的 `list_recog_projects` 工具。
-- **FR-002**: `list_recog_projects` MUST 无必填入参。
-- **FR-003**: `list_recog_projects` MUST 逐条列示确认项目注册表中的项目，并至少返回 `recog_id`、`recog_name`、`bitable_table_id` 以及对应 `bitable_table_id` 是否存在的信息。
-- **FR-004**: `list_recog_projects` MUST NOT 在工具内部自动完成项目匹配、排序裁决或唯一性判断；项目判断由 Agent 或模型完成。
+- **FR-001**: 系统 MUST 提供可通过 bash 以 CLI 方式调用的 `list_recog_items` 工具。
+- **FR-002**: `list_recog_items` MUST 无必填入参。
+- **FR-003**: `list_recog_items` MUST 逐条列示确认项目注册表中的项目，并至少返回 `recog_id`、`recog_name`、`bitable_table_id` 以及对应 `bitable_table_id` 是否存在的信息。
+- **FR-004**: `list_recog_items` MUST NOT 在工具内部自动完成项目匹配、排序裁决或唯一性判断；项目判断由 Agent 或模型完成。
 - **FR-005**: 系统 MUST 提供可通过 bash 以 CLI 方式调用的 `run_recog_rollup` 工具。
 - **FR-006**: `run_recog_rollup` 默认完整流程 MUST 接收 `recog_id`、`period`、`source_file` 三个必填输入。
 - **FR-006A**: `run_recog_rollup` 的 `source_file` MUST 支持传入单个文件路径或目录路径，且目录路径 SHOULD 作为大多数项目的常态输入。
@@ -129,6 +129,7 @@ SUM、条件表达式以及 optional 标记的规则。Agent 先调用
 - **FR-011**: `run_recog_rollup --validate` MUST 检查目标 sheet 的源数据范围是否正确，包括 `category_row`、`field_row`、`last_row` 是否有效，并指出具体错误项。
 - **FR-012**: `run_recog_rollup --validate` MUST 检查源数据字段是否存在且不重复，并指出缺失或重复的具体字段。
 - **FR-013**: `run_recog_rollup --validate` MUST 检查每条 condition 是否可算，并指出不可算 condition 对应的字段或规则项。
+- **FR-013A**: 当 condition 超出首版支持范围时，`run_recog_rollup --validate` MUST 返回明确的“不支持表达能力”错误，而不是让 Agent 自行推断规则含义或发明新 helper。
 - **FR-014**: `run_recog_rollup --validate` MUST 检查目标飞书数据表字段是否存在且类型符合，并指出不存在或类型不匹配的具体字段。
 - **FR-015**: `run_recog_rollup --validate` MUST 返回每条检测项目的通过情况与异常详细信息。
 - **FR-015A**: 当 `run_recog_rollup --validate` 采用目录抽样模式时，返回结果 MUST 标明被抽检的代表文件路径。
@@ -136,6 +137,7 @@ SUM、条件表达式以及 optional 标记的规则。Agent 先调用
 - **FR-016A**: 当 `source_file` 为目录路径时，`run_recog_rollup --preview` MUST 对目录下全部可匹配源文件执行试算。
 - **FR-017**: `run_recog_rollup --preview` MUST 依据规则表中 `GROUP` 与 `SUM` 的定义进行分组汇总，并将结果字段映射为规则指定的输出字段名。
 - **FR-018**: `run_recog_rollup --preview` MUST 支持带条件的汇总规则，仅让满足 condition 的源记录参与对应规则的计算。
+- **FR-018A**: condition 首版 MUST 至少支持以下两类条件汇总：按结算时间过滤，以及按单个可枚举 `GROUP` 型源字段值过滤。
 - **FR-019**: `run_recog_rollup --preview` MUST 支持单个确认项目跨多个 sheet 汇总，并在 GROUP 口径一致的前提下合并结果。
 - **FR-020**: `run_recog_rollup --preview` MUST 按业务约定处理 `optional=True` 的字段缺失情况，其中可选 SUM 字段缺失时不导致整体失败，可选 GROUP 字段缺失时允许结果置空。
 - **FR-020A**: 对于 `csv` 文件或只有单个 sheet 的 `xlsx` 文件，源文件结构定义中的 `sheet` 值 MUST 使用 `DEFAULT` 作为逻辑默认值。
@@ -153,22 +155,13 @@ SUM、条件表达式以及 optional 标记的规则。Agent 先调用
 - **FR-032**: `run_recog_rollup` 在任意模式下 MUST 返回清晰结果，包括成功、失败、失败阶段、是否可重试以及影响范围，便于 Agent 判断下一步动作。
 
 
-| **功能规划**            | 说明          | 备注                                                                                                                                                                               | 参数                                                 | 输出                                |
-| ------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | --------------------------------- |
-| list_recog_projects | 主要用于查找项目id  | - 逐条列示<br>- bitable_table_id是否存在                                                                                                                                                 | null                                               |                                   |
-| run_recog_rollup    | 结构检验+试算+上传  | - `source_file` 可传单文件或目录，目录为常态输入                                                                                                                                      | - recog_id<br>- period<br>- source_file            |                                   |
-| --validate          | 目的是确保可算、可上传 | - sheet是否存在（哪个sheet不存在）<br>- sheet源数据范围是否正确（哪一项不对）<br>- 源数据字段是否均存在，是否重复（哪一个不存在/重复）<br>- condition是否可算（哪个字段的condition不可算）<br>- 飞书数据表字段是否存在且类型符合（哪个字段对应的飞书字段不存在或类型不符）<br>- 目录模式下仅随机抽检1个代表文件，并返回该文件路径 | - recog_id<br>- source_file                        | 每条检测项目的通过情况与异常详细信息                |
-| --preview           |             | - 留底Excel存放路径/tmp/revenue-recognition/outputs/{period} _ {recog_id}_ {timestamp}.xlsx<br>- 清洗结果概况（条数、字段数）<br>- 异常：某个源文件/某个sheet/某条数据与规则不符不可算（哪个源文件，哪个sheet，哪一行数据，哪个字段有问题，有问题的记录） | - recog_id<br>- period<br>- source_file            | 异常信息<br><br>OR<br><br>路径+结果概览<br> |
-| --upload            | 只上传         | - 上传结果回读概览（条数、字段数）<br>- 异常：上传失败（报错信息）（**OPTIONAL**进一步查阅飞书错误信息的途径）<br>- 已有同期间数据默认异常报错，仍可选择追加或覆盖方式强制上传                                                                             | - recog_id<br>- result_file<br><br>--append/upsert | 异常信息<br><br>OR<br><br>成功结果概览      |
-
-
 
 ### Key Entities *(include if feature involves data)*
 
 - **确认项目注册信息**: 表示一个可执行阶段一汇总任务的业务项目，关键属性
   包括 `recog_id`、`recog_name` 和待上传飞书数据库的目标数据
   表 id `bitable_table_id`。
-- **注册项目列表**: 表示 `list_recog_projects` 返回给 Agent 的项目清单，关
+- **注册项目列表**: 表示 `list_recog_items` 返回给 Agent 的项目清单，关
   键属性包括 `recog_id`、`recog_name`、`bitable_table_id`
   以及对应 `bitable_table_id` 是否存在的基础信息。
 - **源文件结构定义**: 描述某个确认项目的源 Excel 应如何读取，关键属性包括
@@ -192,10 +185,10 @@ SUM、条件表达式以及 optional 标记的规则。Agent 先调用
 ### Measurable Outcomes
 
 - **SC-001**: 对于已完成配置的确认项目，Agent 在接收到人类同事给出的确认
-  项目、期间和源文件后，能先调用 `list_recog_projects` 获取项目清单并完成
+  项目、期间和源文件后，能先调用 `list_recog_items` 获取项目清单并完成
   项目判断，再调用 `run_recog_rollup --recog_id --period --source_file`
   完成阶段一完整流程，并让人类同事直接在目标飞书数据表中看到结果。
-- **SC-002**: `list_recog_projects` 的返回结果足以让 Agent 判断目标项目是否
+- **SC-002**: `list_recog_items` 的返回结果足以让 Agent 判断目标项目是否
   可继续处理，包括是否能看到目标 `bitable_table_id` 及其存在状态。
 - **SC-003**: 当 Agent 调用 `run_recog_rollup --validate --recog_id --source_file`
   时，系统能够对每个检测项目返回通过情况，并在失败时指出具体 sheet、范围、
@@ -214,7 +207,7 @@ SUM、条件表达式以及 optional 标记的规则。Agent 先调用
 
 - 首版处理对象为单个确认项目对应的一次完整试算与上传，不包含一次命令同时
   执行多个确认项目的批处理能力。
-- Agent 负责串联调用两个工具：先调用 `list_recog_projects` 获取注册项目列
+- Agent 负责串联调用两个工具：先调用 `list_recog_items` 获取注册项目列
   表并完成项目判断，再调用 `run_recog_rollup` 的默认完整流程或
   `--validate`、`--preview`、`--upload` 单环节流程。
 - `source_file` 首版支持传单文件路径或目录路径，其中目录路径是多数项目的主
@@ -226,8 +219,12 @@ SUM、条件表达式以及 optional 标记的规则。Agent 先调用
 - 当 `source_file` 传目录时，`--validate` 只随机抽取一个代表文件做结构检验；
   目录下其他文件的具体问题由 `--preview` 阶段按文件逐一暴露。
 - 目标输出文件格式为 Excel，且业务方接受通过该文件进行人工复核。
-- 条件规则首版采用单行布尔表达式形式，表达式可以引用源文件字段名，但不包
-  含复杂脚本式流程控制能力。
+- 条件规则首版采用单行布尔表达式形式，统一使用 `F("字段名")` 访问源字段，不
+  包含复杂脚本式流程控制能力。
+- 条件规则首版仅承诺支持“按结算时间过滤”与“按单个可枚举 GROUP 字段值过滤”
+  两类真实已出现的条件汇总。
+- 首版不开放 Agent 自主创建或注册 helper；如现有内置能力无法表达业务需求，
+  Agent 负责明确提示联系开发者扩展能力。
 - 调用方会通过安全配置方式提供访问外部系统所需的凭证，正式实现不直接硬编
   码敏感信息。
 - 默认重复上传判定以“同确认项目 + 同期间”作为第一层拦截条件；更细粒度的

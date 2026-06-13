@@ -1,4 +1,4 @@
-# CLI Contract: `list_recog_projects`
+# CLI Contract: `list_recog_items`
 
 ## Purpose
 
@@ -8,7 +8,7 @@
 ## Invocation
 
 ```bash
-list_recog_projects
+list_recog_items
 ```
 
 ## Inputs

@@ -1,123 +1,160 @@
-# Quickstart: Ralph 式校准开发与验证
+# Quickstart: `run_recog_rollup` 迭代循环指南
 
 ## Purpose
 
-本指南用于通过真实的 202603 源文件和真实历史记录，验证阶段一汇总引擎的正确
-性，并建立 preview-first 的日常开发循环。
+本指南不是一次性的“功能试用说明”，而是 `001-revenue-rollup-cli` 
+循环迭代式开发的操作手册。收入确认的汇总运算，除了核心运算逻辑，还有若干不易梳理归纳的运算细节，为了覆盖所有这些细节，以baseline为黄金标准，采用循环迭代的方式推进开发，逐个确认项目
+推进，持续执行 `validate -> preview -> baseline对账 -> 修正 -> 回归` 的闭环，
+直到汇总工具输出与历史 baseline 完全一致。
+
+本迭代循环只针对 `preview` 的汇总运算逻辑，不包含 `upload` 验证。
+
+
+## Inputs And Artifacts
+
+每一轮迭代至少会使用或更新以下工件：
+
+- [iteration-progress.md](./iteration-progress.md)：记录每个项目当前是否应继续推进，以及每轮迭代的关键结论和增量改动
+- [plan.md](./plan.md)：说明外层 Spec Kit 治理方式，以及内层 Ralph 循环的原则
+- `environment.md`：沉淀多次踩坑后的环境处理经验
+- `sandbox-rules-allow-list.md`：沉淀高频且低风险的提权命令审批入口
 
 ## Prerequisites
 
 - Python 3.13.2 环境可用
 - 关键依赖已安装：`typer`、`pydantic`、`pandas`、`openpyxl`、`requests`
 - Feishu 凭证已通过安全环境变量提供
-- 本地源数据已准备在 `202603-source-excel/`
-- 202603 历史记录可从飞书业务数据库的拷贝镜像表访问
-- 项目覆盖矩阵已建立：[project-coverage-matrix.md](./project-coverage-matrix.md)
-- 多数项目建议将 `source_file` 直接指向一个目录；对于 `csv` 或只有单个 sheet 的
-  `xlsx`，配置表中的 `sheet` 应统一使用 `DEFAULT`
+- 本地源数据已准备完成
+- 目标期间的 baseline 数据可访问
+- 当前特性的项目清单可通过 `list_recog_items` 读取
 
-## Recommended First-Wave Scope
+补充约定：
 
-第一波不要一次上 10+ 个项目，建议先选 2 到 3 个代表性项目：
+- 大多数项目的 `source_file` 应直接传目录路径
+- 飞书相关异常优先查官方文档与现有环境经验，不要先频繁试错
 
-- 高频支付或回款项目
-- 一个 POS 风格的汇总项目
-- 一个已知存在多 sheet 或复杂 condition 的项目
+## Loop Overview
 
-## Validation Workflow
+每次只推进一个 `recog_id`，并严格遵守以下节奏：
 
-### 1. 列出可用项目
+1. 先读 [iteration-progress.md](./iteration-progress.md) 中该项目的当前状态和最近一轮记录
+2. 如果最近结论是“业务TBD”或其他明确阻断，则先停，不继续代码改动
+3. 运行 `validate` 和 `preview`，拿到工具跑出的运算结果
+4. 与 baseline 对账并先做差异溯因
+5. 只要确认是代码或配置问题，就修复并继续当前项目
+6. 如果追到业务语义模糊，就停下来汇报等待业务确认
+7. 每次运行和溯因为一次循环，循环记录需写入 `iteration-progress.md`
+8. 当该项目已与 baseline 一致后，再把它纳入稳定回归集合，回归已通过项目，确认没有把之前项目搞坏，再挑选下一个项目
+
+## Standard Iteration Procedure
+
+### 1. 选择当前项目
+
+先查看已有记录，选择尚未通过 baseline 对账的项目，如对账均通过，则执行以下命令寻找下一个迭代的确认项目：
 
 ```bash
-list_recog_projects
+.\.codex\scripts\rere.cmd list_recog_items
 ```
 
-期望结果：
+选定项目后，在 [iteration-progress.md](./iteration-progress.md) 中为该项目补充或新建记
+录块，再开始本轮执行。
 
-- 能逐条返回项目清单
-- 每条至少包含 `recog_id`、`recog_name`、`bitable_table_id`、`bitable_table_exists`
+### 2. 先检查是否存在业务阻断
 
-### 2. 选择一个首批项目
+开始新一轮前，先看该项目当前 `status`，再读最近一条记录中的结论：
 
-选定一个 `recog_id`，并将其写入 [project-coverage-matrix.md](./project-coverage-matrix.md)。
+- 如果已经标记为“业务TBD”，本轮不继续改代码
+- 如果是飞书权限、表结构权限等硬阻碍，也不继续
+- 只有确认仍可继续工程迭代时，才进入下一步
 
 ### 3. 执行结构检验
 
 ```bash
-run_recog_rollup --validate --recog_id <recog_id> --source_file <path>
+.\.codex\scripts\rere.cmd run_recog_rollup --validate --recog_id <recog_id> --source_file <path>
 ```
 
-期望结果：
+记录重点：
 
-- 要么所有检查通过
-- 要么返回明确的 sheet / 范围 / 字段 / condition / 飞书字段问题
-- 如果传入的是目录，工具只随机抽检一个代表文件，并在结果中标明该文件路径
+- 若 `source_file` 为目录，记录被抽检的代表文件
+- 是否通过
+- 若失败，失败点属于 `sheet`、范围、字段、condition 还是飞书字段问题
+
+处理原则：
+
+- `validate` 失败时，不进入 `preview`
+- 如果失败原因明确是代码或配置问题，直接修复并进入下一轮
+- 如果失败原因涉及业务口径理解，记录后停下等待确认
 
 ### 4. 执行试算
 
 ```bash
-run_recog_rollup --preview --recog_id <recog_id> --period 202603 --source_file <path>
+.\.codex\scripts\rere.cmd run_recog_rollup --preview --recog_id <recog_id> --period <period> --source_file <path>
 ```
 
-期望结果：
+记录重点：
 
-- 成功：返回结果文件路径以及条数、字段数概览
-- 失败：返回可定位到文件、sheet、行、字段的异常信息
-- 如果传入的是目录，工具会对目录下全部匹配源文件执行试算
+- 是否完成
+- 总耗时
+- 如果失败，是否已定位到文件、sheet、行、字段或具体规则
 
-### 5. 将试算结果与 202603 历史记录对账
+处理原则：
 
-使用生成的结果文件，与同一个 `recog_id` 的 202603 历史记录逐项对比。
+- `preview` 失败时，先溯因再修复
+- 不要直接把“预览失败”当成业务差异；先分清是代码 bug、配置问题，还是业务语义问题
+
+### 5. 与 baseline 对账
+
+使用本轮 `preview` 结果，对同一 `recog_id`、同一期间的 baseline 做逐项比较。
 
 通过标准：
 
-- 字段级金额和口径在约定精度与归一化规则下与历史记录一致
+- 字段级金额与口径在约定精度、归一化规则下与 baseline 一致
 
-不通过标准：
+不通过时的处理顺序：
 
-- 必须先整理差异结果和判断建议并汇报给业务负责人
-- 仅在业务负责人确认口径后，才可将差异归类为：
-  - 通用引擎缺口
-  - 项目特有规则缺口
-  - 实现 bug
+1. 先判断差异是否来自代码实现、规则配置或辅助脚本
+2. 如果是工程问题，直接修复，并在记录中写明修复方案
+3. 如果最终追溯到业务语义模糊、历史口径不明确或 baseline 本身需要业务解释，则将结论明确记为“业务TBD”
 
-### 6. 修正并回归
+注意：
 
-每次修正后都执行：
+- 差异没有被溯因之前，不要贸然继续扩展规则
+- 业务语义问题不是代码 bug，不能由开发侧自行拍板
 
-1. 重跑当前首批项目
-2. 重跑所有已通过项目
-3. 更新 [project-coverage-matrix.md](./project-coverage-matrix.md)
+### 6. 修正，当前项目通过后再回归
 
-### 7. 仅在 preview 稳定后执行上传
+每次修正后，都至少执行以下动作：
 
-```bash
-run_recog_rollup --upload --recog_id <recog_id> --result_file <preview_file>
-```
+1. 重跑当前项目的必要阶段
+2. 只有当前项目已经对账通过时，再重跑所有已进入稳定回归集合的项目
+3. 更新 [iteration-progress.md](./iteration-progress.md)
 
-在活跃开发阶段，优先上传到飞书业务数据库的拷贝镜像表。
 
-强制上传策略：
 
-```bash
-run_recog_rollup --upload --append --recog_id <recog_id> --result_file <preview_file>
-run_recog_rollup --upload --upsert --recog_id <recog_id> --result_file <preview_file>
-```
+## Stop Conditions
 
-## Done Criteria for One Project
+以下情况应停止当前项目迭代，而不是继续盲改：
 
-一个项目只有在满足以下条件后才算校准通过：
+- 最近一轮结论已经是“业务TBD”，差异需要业务方解释口径
+- 飞书权限、表权限或其他外部依赖构成硬阻碍
 
-- `list_recog_projects` 能正确暴露该项目
+## Done Criteria For One Project
+
+一个确认项目只有在满足以下条件后，才算完成当前阶段校准：
+
+- `list_recog_items` 能正确暴露该项目
 - `--validate` 通过
-- `--preview` 输出与 202603 历史记录一致
-- 所有 preview/baseline 差异都已经过业务负责人确认
-- 后续新增规则后回归仍通过
-- 至少在一个安全环境中验证过上传行为
+- `--preview` 输出与目标期间 baseline 一致
+- 当前差异已完成溯因且得到解决
+- 当前项目对账通过后，回归集合仍通过
+
 
 ## References
 
+- [spec.md](./spec.md)
+- [plan.md](./plan.md)
 - [research.md](./research.md)
 - [data-model.md](./data-model.md)
-- [project-coverage-matrix.md](./project-coverage-matrix.md)
+- [iteration-progress.md](./iteration-progress.md)
+- [goal_run_recog_rollup.md](./goals/goal_run_recog_rollup.md)
 - [docs/feishu_bitable_api_notes.md](../../docs/feishu_bitable_api_notes.md)

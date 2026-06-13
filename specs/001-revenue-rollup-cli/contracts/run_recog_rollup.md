@@ -61,7 +61,7 @@ run_recog_rollup --upload --upsert --recog_id <recog_id> --result_file <path>
       "details": []
     }
   ],
-  "sampled_source_file": "D:/AI/rere-agent/202603-source-excel/微信/武汉市蔡林记餐饮发展有限公司.csv",
+  "sampled_source_file": "D:/AI/rere-agent/202605-source-excel/微信/武汉市蔡林记餐饮发展有限公司.csv",
   "error_count": 0
 }
 ```
@@ -73,8 +73,8 @@ run_recog_rollup --upload --upsert --recog_id <recog_id> --result_file <path>
   "status": "ok",
   "mode": "preview",
   "recog_id": "wechat_pay_settlement",
-  "period": "202603",
-  "result_file": "/tmp/revenue-recognition/outputs/202603_wechat_pay_settlement_20260606-210000.xlsx",
+  "period": "202605",
+  "result_file": "/tmp/revenue-recognition/outputs/202605_wechat_pay_settlement_20260606-210000.xlsx",
   "row_count": 120,
   "field_count": 38,
   "warnings": []
@@ -88,7 +88,7 @@ run_recog_rollup --upload --upsert --recog_id <recog_id> --result_file <path>
   "status": "ok",
   "mode": "upload",
   "recog_id": "wechat_pay_settlement",
-  "result_file": "/tmp/revenue-recognition/outputs/202603_wechat_pay_settlement_20260606-210000.xlsx",
+  "result_file": "/tmp/revenue-recognition/outputs/202605_wechat_pay_settlement_20260606-210000.xlsx",
   "target_table_id": "tblyOiWLnWW4QiYO",
   "upload_strategy": "append",
   "row_count": 120,
@@ -106,7 +106,7 @@ run_recog_rollup --upload --upsert --recog_id <recog_id> --result_file <path>
   "recog_id": "wechat_pay_settlement",
   "errors": [
     {
-      "source_file": "D:/AI/rere-agent/202603-source-excel/微信/example.xlsx",
+      "source_file": "D:/AI/rere-agent/202605-source-excel/微信/example.xlsx",
       "sheet": "流水明细",
       "row": 123,
       "field": "结算金额",

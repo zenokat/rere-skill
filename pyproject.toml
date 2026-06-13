@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "revenue-rollup-cli"
+version = "0.1.0"
+description = "供 Agent 调用的收入确认阶段一汇总 CLI 工具。"
+readme = "AGENTS.md"
+requires-python = ">=3.13"
+dependencies = [
+    "openpyxl>=3.1,<4.0",
+    "pandas>=2.2,<3.0",
+    "pydantic>=2.8,<3.0",
+    "requests>=2.32,<3.0",
+    "typer>=0.12,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9.0",
+]
+
+[project.scripts]
+list_recog_items = "cli.list_recog_items:main"
+run_recog_rollup = "cli.run_recog_rollup:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
