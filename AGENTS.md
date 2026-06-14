@@ -9,7 +9,8 @@ at specs/001-revenue-rollup-cli/plan.md
 
 
 ## 环境记忆
-请在开发过程中将遇到的任何多次尝试才成功的环境、工具交互经验固化在 `environment.md` ，避免屡次碰壁。
+查阅`environment.md`，了解开发过程中可能遇到的环境问题与处理经验，并将新遇到的任何多次尝试才成功的环境、工具交互经验写入，形成复利闭环
+
 ### 应该记什么
 `environment.md` 只记录“跨多轮迭代、跨多个任务仍会反复遇到”的通用环境或工具交互经验，例如：
 - shell / PowerShell / heredoc 的编码、转义、参数传递、代理继承问题；

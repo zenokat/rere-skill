@@ -1,4 +1,4 @@
-# Implementation Plan: 收入确认阶段一汇总工具
+# Implementation Plan: 收入确认 Skill 第 3 步汇总工具
 
 **Branch**: `001-revenue-rollup-cli` | **Date**: 2026-06-06 | **Spec**: [spec.md](./spec.md)
 
@@ -9,9 +9,11 @@
 
 ## Summary
 
-本功能要交付两个可被 Agent 调用的 CLI 工具：`list_recog_items` 与
-`run_recog_rollup`。其中 `list_recog_items` 负责暴露可选项目清单，
-`run_recog_rollup` 负责阶段一的结构检验、试算和上传。
+本 feature 只覆盖收入确认 Skill 十步 SOP 中的第 3 步“汇总”，要交付两个可
+被 Agent 调用的 CLI 工具：`list_recog_items` 与 `run_recog_rollup`。其中
+`list_recog_items` 负责暴露可选项目清单，`run_recog_rollup` 负责读取已完成
+预处理的干净输入，执行门店口径汇总，并把结果上传到业务数据库，作为下游收入
+回款确认继续计算的字段原材料。
 
 实现策略采用“通用汇总引擎 + 项目级小规则扩展 + 真实历史记录校准”的组合：
 
@@ -29,10 +31,11 @@
 
 **Primary Dependencies**: Typer、Pydantic、pandas、openpyxl、requests
 
-**Storage**: 本地开发阶段使用本地 Excel / CSV 源文件、`/tmp/revenue-recognition/outputs/`
-下的阶段性结果文件、Feishu Bitable 远端业务表拷贝镜像，以及用于记录内层迭代
-证据的 Markdown 文档 `iteration-progress.md`。`source_file` 支持单文件或目录输
-入，其中目录是多数项目的常态输入
+**Storage**: 本地开发阶段使用预处理后的本地 Excel / CSV 干净源文件、
+`/tmp/revenue-recognition/outputs/` 下的阶段性结果文件、Feishu Bitable 远端
+业务表拷贝镜像，以及用于记录内层迭代证据的 Markdown 文档
+`iteration-progress.md`。`source_file` 支持单文件或目录输入，其中目录是多数
+项目的常态输入，但语义上必须是已完成预处理的干净输入
 
 **Testing**: pytest、CLI 契约测试、本地 Excel 样本集成测试、基于 202605 历史
 记录的基线差异对比检查
@@ -51,7 +54,8 @@ bash 友好，便于后续迁移到云端 Agent 运行时
 与 baseline 不一致的差异都必须先汇报产品负责人并获得业务解释确认，不能由开
 发方或 Agent 自行决定规则含义；当业务条件超出首版 condition 能力时，Agent
 必须停在能力边界并提示联系开发者扩展，而不是通过 project patch 或临时 helper
-自行绕过框架
+自行绕过框架；本 feature 不把折后收入、实际回款、平台服务费、税费、配送费等
+最终确认字段内嵌进汇总引擎，这些字段仍由下游飞书多维表配置继续计算
 
 **Scale/Scope**: 首批范围是 10+ 个 `recog_rollup` 项目，第一波先校准 2 到 3 个
 代表性项目；每个项目都可能涉及多个文件和多个 sheet。对 `csv` 或只有单个 sheet 的
@@ -84,6 +88,14 @@ specs/001-revenue-rollup-cli/
 │   ├── list_recog_items.md
 │   └── run_recog_rollup.md
 └── tasks.md
+```
+
+### Reference Docs (repository scope)
+
+```text
+ref-docs/
+├── revenue_recognition_skill_workflow.md
+└── feishu_bitable_api_notes.md
 ```
 
 ### Source Code (repository root)
@@ -125,6 +137,7 @@ tests/
 - `quickstart.md`：作为日常执行内层 Ralph 式迭代循环的操作指南
 - `iteration-progress.md`：作为每个 `recog_id` 的当前推进状态与每轮关键增量记录
 - `tasks.md`：维护实现任务、验证任务与跨阶段收尾工作
+- `ref-docs/revenue_recognition_skill_workflow.md`：维护整个收入确认 Skill 的完整业务 SOP、上下游交接物与职责边界，不承担单个 feature 的实现约束
 
 ## Ralph Loop Strategy
 

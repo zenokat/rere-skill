@@ -3,7 +3,7 @@
 description: "Task list for revenue recognition stage-one rollup implementation"
 ---
 
-# Tasks: 收入确认阶段一汇总工具
+# Tasks: 收入确认 Skill 第 3 步汇总工具
 
 **Input**: Design documents from `/specs/001-revenue-rollup-cli/`
 
@@ -55,9 +55,9 @@ description: "Task list for revenue recognition stage-one rollup implementation"
 
 ## Phase 3: User Story 1 - Agent 调用 `list_recog_items` 与 `run_recog_rollup` 完成端到端汇总 (Priority: P1) 🎯 MVP
 
-**Goal**: 让 Agent 能先获取项目列表，再对一个已确认项目执行默认完整流程
+**Goal**: 让 Agent 能先获取项目列表，再对一个已确认项目的预处理后干净输入执行默认完整流程
 
-**Independent Test**: Agent 可以调用 `list_recog_items` 获取项目清单，并成功调用 `run_recog_rollup --recog_id --period --source_file` 完成完整流程；若任一环节失败，工具能明确返回失败阶段
+**Independent Test**: Agent 可以调用 `list_recog_items` 获取项目清单，并成功调用 `run_recog_rollup --recog_id --period --source_file` 对预处理后干净输入完成完整流程；若任一环节失败，工具能明确返回失败阶段
 
 ### Tests for User Story 1
 
@@ -131,9 +131,8 @@ description: "Task list for revenue recognition stage-one rollup implementation"
 
 - [X] T035 [P] 在 `tests/unit/test_output_paths.py` 与 `tests/unit/test_project_patches.py` 中补充输出路径辅助函数与项目补丁注册器的单元测试
 - [X] T036 [P] 在 `tests/unit/test_rule_engine.py` 与 `tests/unit/test_normalizers.py` 中补充 condition 求值与归一化工具的单元测试
-- [ ] T037 在 `docs/feishu_bitable_api_notes.md` 与 `specs/001-revenue-rollup-cli/quickstart.md` 中更新镜像表上传与业务确认闸门的开发说明
-- [ ] T038 运行首波 quickstart 验证并更新 `specs/001-revenue-rollup-cli/iteration-progress.md`
-- [ ] T039 在 `specs/001-revenue-rollup-cli/validate-output-contract.md` 与 `tests/contract/test_validate_preview_cli.py` 中补充“超出首版 condition 能力边界时返回明确错误并提示联系开发者扩展”的契约约束
+- [ ] T037 运行首波 quickstart 验证并更新 `specs/001-revenue-rollup-cli/iteration-progress.md`
+- [ ] T038 在 `specs/001-revenue-rollup-cli/validate-output-contract.md` 与 `tests/contract/test_validate_preview_cli.py` 中补充“超出首版 condition 能力边界时返回明确错误并提示联系开发者扩展”的契约约束
 
 ---
 
@@ -213,3 +212,4 @@ Task: "Implement condition evaluation and optional field handling in src/core/ru
 - `iteration-progress.md` 是 Ralph 内层循环的证据与状态记录，不是装饰文档
 - 任何会影响规则解释的差异都不能由实现层自行拍板
 - 内层迭代循环只针对 preview/baseline 对账；upload 是独立验证动作
+- 完整收入确认 Skill 的业务工作流单独维护在 `ref-docs/revenue_recognition_skill_workflow.md`，不要继续塞回本 feature 的 spec / tasks

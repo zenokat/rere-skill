@@ -1,4 +1,4 @@
-# Research: 收入确认阶段一汇总工具
+# Research: 收入确认 Skill 第 3 步汇总工具
 
 ## Decision 1: 使用 Python 3.13 CLI 技术栈
 
@@ -99,12 +99,24 @@
 ## Decision 10: 目录模式下 validate 采用抽样校验，preview 处理全部文件
 
 - **Decision**: `source_file` 支持单文件和目录两种输入，其中目录是多数项目的常态输入。
-  当输入为目录时，`--validate` 只随机抽取一个代表文件做结构校验；`--preview` 再对目录
-  下全部匹配源文件执行真实试算。对 `csv` 或只有单个 sheet 的 `xlsx`，配置中的 `sheet`
-  统一使用 `DEFAULT`。
+  但该输入语义限定为“已完成文件预处理的干净单文件或干净目录”。当输入为目录时，
+  `--validate` 只随机抽取一个代表文件做结构校验；`--preview` 再对目录下全部匹配源文件
+  执行真实试算。对 `csv` 或只有单个 sheet 的 `xlsx`，配置中的 `sheet` 统一使用 `DEFAULT`。
 - **Rationale**: 实际项目常有大量格式相同、按门店或账号拆分的源文件。若在 validate
   阶段扫描全部文件，会增加无效耗时；把逐文件异常定位留给 preview，更符合开发节奏和信号
   价值。
 - **Alternatives considered**:
   - validate 扫描目录下全部文件：更完整，但重复度高、耗时更长，且与 preview 的异常信号重叠。
   - 禁止目录输入，只允许单文件：不符合多数项目的真实使用方式。
+
+## Decision 11: 将完整 Skill 业务工作流独立维护为仓库级参考文档
+
+- **Decision**: 将收入确认 Skill 的十步 SOP、上下游交接物和职责边界独立维护在
+  `ref-docs/revenue_recognition_skill_workflow.md`，而不是继续扩张
+  `001-revenue-rollup-cli` 的 feature 级 spec。
+- **Rationale**: 本仓库承载的是整个收入确认 Skill 的开发，而 `001-revenue-rollup-cli`
+  只是其中第 3 步“汇总”工具。若把完整业务工作流继续写进单个 feature 的 spec/plan/tasks，
+  会模糊“仓库级业务上下文”和“feature 级实现约束”的边界。
+- **Alternatives considered**:
+  - 只在 `spec.md` 中维护完整十步 SOP：上下文足够，但会持续挤压 feature spec 的纯度。
+  - 把完整业务工作流写进 `AGENTS.md`：对未来协作有帮助，但不适合作为正式业务参考文档的唯一载体。

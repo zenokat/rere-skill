@@ -1,10 +1,12 @@
-# Data Model: 收入确认阶段一汇总工具
+# Data Model: 收入确认 Skill 第 3 步汇总工具
 
 ## Overview
 
-这个功能的核心是一个由项目目录驱动的汇总引擎。项目目录负责标识当前处理的
-业务项目，sheet 结构定义负责描述如何读取源 Excel，规则集合负责定义如何汇
-总生成字段，结果文件则作为试算与上传之间的边界产物。
+这个功能的核心是一个由确认项目目录驱动的汇总引擎。它只覆盖收入确认 Skill 十步
+SOP 中的第 3 步“汇总”。确认项目目录负责注册可处理的业务项目，预处理后源文件
+集合负责提供干净输入，sheet 结构定义负责描述如何读取源 Excel，规则集合负责
+定义如何汇总生成字段，结果文件则作为试算与上传之间的边界产物，并作为下游收
+入回款确认继续计算的原材料。
 
 ## Entities
 
@@ -18,6 +20,17 @@
 | `recog_name` | string | 供 Agent 理解的可读项目名称 |
 | `bitable_table_id` | string | 阶段一上传目标的 Bitable 数据表 |
 | `bitable_table_exists` | boolean | 当前目标表是否可访问 |
+
+### PreprocessedSourceInput
+
+表示一个已经完成文件预处理、可被 `source_file` 接受的输入集合。
+
+| Field | Type | Description |
+|---|---|---|
+| `path` | path | 传给 `run_recog_rollup` 的单文件路径或目录路径 |
+| `kind` | enum | `file` 或 `directory` |
+| `preprocessed` | boolean | 是否已完成解压、识别和按确认项目分拣 |
+| `contains_only_target_files` | boolean | 是否只包含当前确认项目所需的那类业务文件 |
 
 ### SourceSheetSpec
 
@@ -76,6 +89,11 @@
 | `row_count` | integer | 输出记录数 |
 | `field_count` | integer | 输出字段数 |
 | `generated_at` | datetime | 用于命名文件的生成时间 |
+
+补充说明：
+
+- `PreviewArtifact` 代表门店级基础事实字段集合，可供下游收入回款确认继续做字段间运算，
+  但不等同于最终确认收入或最终回款结果。
 
 ### PreviewIssue
 

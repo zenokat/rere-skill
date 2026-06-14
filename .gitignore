@@ -1,7 +1,6 @@
 .agents/skills
 .specify/
 2026**-source-excel/
-ref-docs/
 prompt.md
 speckit-ralph.md
 tool_design.md

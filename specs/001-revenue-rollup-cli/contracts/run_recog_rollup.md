@@ -2,7 +2,9 @@
 
 ## Purpose
 
-执行阶段一收入确认汇总流程，既支持完整流程，也支持单独运行某个环节。
+执行收入确认 Skill 第 3 步“汇总”流程，既支持完整流程，也支持单独运行某个
+环节。该命令消费预处理后的干净输入，并产出供下游收入回款确认继续计算的字段
+原材料。
 
 ## Invocation
 
@@ -39,6 +41,8 @@ run_recog_rollup --upload --upsert --recog_id <recog_id> --result_file <path>
   `validate -> preview -> upload`
 - `--append` 与 `--upsert` 互斥，且只能和 `--upload` 一起使用
 - `--source_file` 可以是单文件路径或目录路径，目录路径是多数项目的常态输入
+- `--source_file` 的业务语义必须是已完成文件预处理的干净单文件或干净目录，不接
+  受原始压缩包，也不接受仍混放多种业务文件的下载目录
 - 当 `--source_file` 为目录路径时，`--validate` 仅随机抽检一个代表文件；`--preview`
   对目录下全部匹配源文件执行试算
 - 对 `csv` 或只有单个 sheet 的 `xlsx`，配置中的 `sheet` 使用 `DEFAULT`
@@ -130,4 +134,6 @@ run_recog_rollup --upload --upsert --recog_id <recog_id> --result_file <path>
 ## Notes
 
 - `--result_file` 是 `--preview` 和 `--upload` 之间的正式交接产物。
+- `--preview` 和 `--upload` 产出的数据是门店级基础事实字段，不直接等同于折后收
+  入、实际回款、平台服务费、税费、配送费等最终确认字段。
 - 在高频开发阶段，`--preview` 是主对账路径，`--upload` 应作为单独受控动作。

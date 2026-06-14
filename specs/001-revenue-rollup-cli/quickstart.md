@@ -1,13 +1,20 @@
-# Quickstart: `run_recog_rollup` 迭代循环指南
+# Quickstart: 收入确认 Skill 第 3 步汇总工具迭代循环指南
 
 ## Purpose
 
-本指南不是一次性的“功能试用说明”，而是 `001-revenue-rollup-cli` 
-循环迭代式开发的操作手册。收入确认的汇总运算，除了核心运算逻辑，还有若干不易梳理归纳的运算细节，为了覆盖所有这些细节，以baseline为黄金标准，采用循环迭代的方式推进开发，逐个确认项目
-推进，持续执行 `validate -> preview -> baseline对账 -> 修正 -> 回归` 的闭环，
-直到汇总工具输出与历史 baseline 完全一致。
+本指南不是一次性的“功能试用说明”，而是 `001-revenue-rollup-cli`
+循环迭代式开发的操作手册。它只覆盖收入确认 Skill 十步 SOP 中的第 3 步“汇
+总”。完整业务工作流见
+[revenue_recognition_skill_workflow.md](../../ref-docs/revenue_recognition_skill_workflow.md)。
+
+收入确认的汇总运算，除了核心运算逻辑，还有若干不易梳理归纳的运算细节，为
+了覆盖所有这些细节，以 baseline 为黄金标准，采用循环迭代的方式推进开发，逐
+个确认项目推进，持续执行 `validate -> preview -> baseline对账 -> 修正 -> 回归`
+的闭环，直到汇总工具输出与历史 baseline 完全一致。
 
 本迭代循环只针对 `preview` 的汇总运算逻辑，不包含 `upload` 验证。
+下载源文件、文件预处理、收入回款确认、后处理、RPA 入账、验算、分发、调整和
+封版均不属于本指南的执行范围。
 
 
 ## Inputs And Artifacts
@@ -24,13 +31,14 @@
 - Python 3.13.2 环境可用
 - 关键依赖已安装：`typer`、`pydantic`、`pandas`、`openpyxl`、`requests`
 - Feishu 凭证已通过安全环境变量提供
-- 本地源数据已准备完成
+- 本地源数据已完成文件预处理，能够以干净单文件或干净目录形式提供给 `source_file`
 - 目标期间的 baseline 数据可访问
 - 当前特性的项目清单可通过 `list_recog_items` 读取
 
 补充约定：
 
 - 大多数项目的 `source_file` 应直接传目录路径
+- `source_file` 不能直接指向原始压缩包，也不能指向仍混放多种业务文件的下载目录
 - 飞书相关异常优先查官方文档与现有环境经验，不要先频繁试错
 
 ## Loop Overview
@@ -40,6 +48,7 @@
 1. 先读 [iteration-progress.md](./iteration-progress.md) 中该项目的当前状态和最近一轮记录
 2. 如果最近结论是“业务TBD”或其他明确阻断，则先停，不继续代码改动
 3. 运行 `validate` 和 `preview`，拿到工具跑出的运算结果
+   这里的输入前提是：当前项目所需文件已经被预处理整理为干净目录或单文件
 4. 与 baseline 对账并先做差异溯因
 5. 只要确认是代码或配置问题，就修复并继续当前项目
 6. 如果追到业务语义模糊，就停下来汇报等待业务确认
@@ -157,4 +166,5 @@
 - [data-model.md](./data-model.md)
 - [iteration-progress.md](./iteration-progress.md)
 - [goal_run_recog_rollup.md](./goals/goal_run_recog_rollup.md)
-- [docs/feishu_bitable_api_notes.md](../../docs/feishu_bitable_api_notes.md)
+- [revenue_recognition_skill_workflow.md](../../ref-docs/revenue_recognition_skill_workflow.md)
+- [feishu_bitable_api_notes.md](../../ref-docs/feishu_bitable_api_notes.md)
