@@ -60,6 +60,10 @@ SOP 中的第 3 步“汇总”。确认项目目录负责注册可处理的业�
 | `condition` | string? | 可选条件表达式 |
 | `optional` | boolean | 是否允许源字段缺失 |
 
+补充约束：
+- 同一 `recog_id` 下，每个 `SUM` 类型的 `bitable_field` 只能在规则表中出现一次。
+- 如果源目录同时存在多种 schema，应将它们分别映射为不同的基础事实字段，再由下游收入回款确认步骤做字段间运算。
+
 ### ValidationCheckResult
 
 表示一次结构或上传可行性检查结果。

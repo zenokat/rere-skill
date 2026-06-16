@@ -6,6 +6,7 @@ from pathlib import Path
 
 from core.catalog.project_catalog_repository import ProjectCatalogRepository
 from core.rules.project_patches import apply_project_patches
+from core.rules.rule_bundle_guard import ensure_rule_bundle_supported
 from core.rules.rule_engine import (
     ConditionEvaluationError,
     build_prepared_condition,
@@ -61,7 +62,9 @@ class ValidateStageImpl:
 
         source_files = discover_source_files(source_file)
         sampled_source_file = choose_validation_sample(source_files=source_files, seed_key=f"{recog_id}:{source_file}")
-        rule_bundle = apply_project_patches(self._rule_repository.load_rule_bundle(recog_id))
+        rule_bundle = ensure_rule_bundle_supported(
+            apply_project_patches(self._rule_repository.load_rule_bundle(recog_id))
+        )
         project = self._catalog_repository.get_project(recog_id)
         if project is None or not project.bitable_table_id:
             raise CliExecutionError(

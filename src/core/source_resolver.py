@@ -23,6 +23,7 @@ DataRow = dict[tuple[str, str], Any]
 DataRowIteratorFactory = Callable[[], Iterator[tuple[int, DataRow]]]
 TEMPORARY_SOURCE_PREFIXES = ("~$",)
 FILE_NAME_VIRTUAL_FIELD = "FILE_NAME"
+SUPPORTED_CSV_ENCODINGS = ("utf-8-sig", "gb18030")
 
 
 @dataclass(frozen=True)
@@ -118,8 +119,7 @@ class SourceFileLoadCache:
             raise ValueError("CSV files must use the DEFAULT logical sheet.")
         raw_rows = self.csv_rows_by_file.get(source_file)
         if raw_rows is None:
-            with source_file.open("r", encoding="utf-8-sig", newline="") as handle:
-                raw_rows = [list(row) for row in csv.reader(handle) if any(cell.strip() for cell in row if isinstance(cell, str))]
+            raw_rows = _read_csv_rows(source_file)
             self.csv_rows_by_file[source_file] = raw_rows
         return raw_rows, DEFAULT_LOGICAL_SHEET
 
@@ -247,6 +247,7 @@ def build_sheet_dataset(
         total_rows=total_rows,
         resolved_last_row=resolved_last_row,
         data_start_row=data_start_row,
+        allow_header_only_empty=spec.last_row == -1,
     )
 
     columns, duplicate_columns = _build_column_descriptors(raw_rows=raw_rows, spec=spec)
@@ -259,6 +260,8 @@ def build_sheet_dataset(
             columns=columns,
             source_file=source_file,
         )
+        if _is_effectively_blank_data_row(row_values):
+            continue
         data_rows.append(row_values)
         data_row_numbers.append(row_number)
 
@@ -312,6 +315,7 @@ def _build_streaming_sheet_dataset(source_file: Path, spec: SourceSheetSpec) -> 
             total_rows=total_rows,
             resolved_last_row=resolved_last_row,
             data_start_row=data_start_row,
+            allow_header_only_empty=spec.last_row == -1,
         )
 
         header_rows = [
@@ -386,9 +390,11 @@ def _build_streaming_sheet_dataset_to_end(source_file: Path, spec: SourceSheetSp
             None,
         )
         if first_raw_row is None:
-            raise ValueError("The data range is empty after applying category_row, field_row, and last_row.")
-
-        first_data_row = _build_row_value_map(row_values=first_raw_row, columns=columns, source_file=source_file)
+            first_data_row = None
+            first_data_row_number = None
+        else:
+            first_data_row = _build_row_value_map(row_values=first_raw_row, columns=columns, source_file=source_file)
+            first_data_row_number = data_start_row
     finally:
         workbook.close()
 
@@ -403,7 +409,7 @@ def _build_streaming_sheet_dataset_to_end(source_file: Path, spec: SourceSheetSp
         data_rows=[],
         data_row_numbers=[],
         first_data_row=first_data_row,
-        first_data_row_number=data_start_row,
+        first_data_row_number=first_data_row_number,
         row_iterator_factory=lambda: _iter_workbook_sheet_rows_to_end(
             source_file=source_file,
             logical_sheet=spec.sheet,
@@ -454,8 +460,7 @@ def _load_raw_rows(
     if suffix == ".csv":
         if logical_sheet != DEFAULT_LOGICAL_SHEET:
             raise ValueError("CSV files must use the DEFAULT logical sheet.")
-        with source_file.open("r", encoding="utf-8-sig", newline="") as handle:
-            return [list(row) for row in csv.reader(handle) if any(cell.strip() for cell in row if isinstance(cell, str))], DEFAULT_LOGICAL_SHEET
+        return _read_csv_rows(source_file), DEFAULT_LOGICAL_SHEET
 
     snapshot = _build_workbook_snapshot(source_file)
     return snapshot.resolve_rows(logical_sheet)
@@ -478,6 +483,28 @@ def _build_workbook_snapshot(source_file: Path) -> WorkbookSnapshot:
         )
     finally:
         workbook.close()
+
+
+def _read_csv_rows(source_file: Path) -> list[list[Any]]:
+    """用约定编码集合读取 CSV，并过滤全空白行。"""
+
+    decode_errors: list[str] = []
+    for encoding in SUPPORTED_CSV_ENCODINGS:
+        try:
+            with source_file.open("r", encoding=encoding, newline="") as handle:
+                return [
+                    list(row)
+                    for row in csv.reader(handle)
+                    if any(cell.strip() for cell in row if isinstance(cell, str))
+                ]
+        except UnicodeDecodeError as exc:
+            decode_errors.append(f"{encoding}: {exc}")
+
+    supported = ", ".join(SUPPORTED_CSV_ENCODINGS)
+    error_summary = "; ".join(decode_errors)
+    raise ValueError(
+        f"CSV file cannot be decoded with supported encodings ({supported}). {error_summary}"
+    )
 
 
 def _resolve_workbook_worksheet(workbook, logical_sheet: str):
@@ -535,6 +562,7 @@ def _validate_sheet_bounds(
     total_rows: int,
     resolved_last_row: int,
     data_start_row: int,
+    allow_header_only_empty: bool = False,
 ) -> None:
     """统一校验 sheet 的行边界配置。"""
 
@@ -547,6 +575,8 @@ def _validate_sheet_bounds(
     if spec.category_row is not None and spec.category_row > total_rows:
         raise ValueError("category_row exceeds the actual file row count.")
     if data_start_row > resolved_last_row:
+        if allow_header_only_empty and data_start_row == total_rows + 1 and resolved_last_row == total_rows:
+            return
         raise ValueError("The data range is empty after applying category_row, field_row, and last_row.")
 
 
@@ -614,6 +644,17 @@ def _build_row_value_map(
     return mapped_row
 
 
+def _is_effectively_blank_data_row(row_values: DataRow) -> bool:
+    """判断一行数据在忽略虚拟列后是否全为空白。"""
+
+    for (category, field), value in row_values.items():
+        if category == "" and field == FILE_NAME_VIRTUAL_FIELD:
+            continue
+        if value not in (None, ""):
+            return False
+    return True
+
+
 def _iter_workbook_sheet_rows(
     *,
     source_file: Path,
@@ -634,7 +675,10 @@ def _iter_workbook_sheet_rows(
             worksheet.iter_rows(min_row=data_start_row, max_row=resolved_last_row, values_only=True),
             start=data_start_row,
         ):
-            yield row_number, _build_row_value_map(row_values=row_values, columns=columns, source_file=source_file)
+            mapped_row = _build_row_value_map(row_values=row_values, columns=columns, source_file=source_file)
+            if _is_effectively_blank_data_row(mapped_row):
+                continue
+            yield row_number, mapped_row
     finally:
         workbook.close()
 
@@ -658,7 +702,10 @@ def _iter_workbook_sheet_rows_to_end(
             worksheet.iter_rows(min_row=data_start_row, values_only=True),
             start=data_start_row,
         ):
-            yield row_number, _build_row_value_map(row_values=row_values, columns=columns, source_file=source_file)
+            mapped_row = _build_row_value_map(row_values=row_values, columns=columns, source_file=source_file)
+            if _is_effectively_blank_data_row(mapped_row):
+                continue
+            yield row_number, mapped_row
     finally:
         workbook.close()
 
@@ -666,7 +713,7 @@ def _iter_workbook_sheet_rows_to_end(
 def _prepare_read_only_worksheet(worksheet, *, force_calculate: bool) -> None:
     """修正只读模式下可能失真的 worksheet 维度元数据。"""
 
-    if getattr(worksheet, "max_row", None) == 1 and hasattr(worksheet, "reset_dimensions"):
+    if hasattr(worksheet, "reset_dimensions"):
         worksheet.reset_dimensions()
         if force_calculate and hasattr(worksheet, "calculate_dimension"):
             worksheet.calculate_dimension(force=True)

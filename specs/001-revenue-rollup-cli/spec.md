@@ -189,6 +189,7 @@ SUM、条件表达式以及 optional 标记的规则。Agent 先调用
 - **FR-019**: `run_recog_rollup --preview` MUST 支持单个确认项目跨多个 sheet 汇总，并在 GROUP 口径一致的前提下合并结果。
 - **FR-020**: `run_recog_rollup --preview` MUST 按业务约定处理 `optional=True` 的字段缺失情况，其中可选 SUM 字段缺失时不导致整体失败，可选 GROUP 字段缺失时允许结果置空。
 - **FR-020A**: 对于 `csv` 文件或只有单个 sheet 的 `xlsx` 文件，源文件结构定义中的 `sheet` 值 MUST 使用 `DEFAULT` 作为逻辑默认值。
+- **FR-020B**: 同一 `recog_id` 下，`SUM` 类型规则的 `bitable_field` MUST 唯一；汇总规则表中的一条记录只允许描述一个输出字段的一条汇总规则，不允许通过多条规则共同累加同一个业务数据库字段。
 - **FR-021**: `run_recog_rollup --preview` MUST 在成功时将结果文件保存到 `/tmp/revenue-recognition/outputs/{period}_{recog_id}_{timestamp}.xlsx`。
 - **FR-022**: `run_recog_rollup --preview` MUST 为每一条输出记录带上期间信息，并在成功时返回结果文件路径与结果概览，至少包含条数与字段数。
 - **FR-022A**: `run_recog_rollup --preview` 产出的记录 MUST 被定义为门店级基础事实字段，用作下游收入回款确认的字段原材料，而不是最终确认收入、最终回款或最终记账结果。
@@ -218,7 +219,7 @@ SUM、条件表达式以及 optional 标记的规则。Agent 先调用
 - **源文件结构定义**: 描述某个确认项目的源 Excel 应如何读取，关键属性包括
   `sheet`、`category_row`、`field_row`、`last_row`以及sheet是否允许缺失`optional`。
   其中 `sheet=DEFAULT` 表示 `csv` 或只有单个 sheet 的 `xlsx` 的逻辑默认 sheet。
-- **汇总规则**: 定义某个输出字段如何从源数据计算得到，关键属性包括 `bitable_field`、`sheet`、`type`、`field`、`condition`和是否允许缺失`optional`。
+- **汇总规则**: 定义某个输出字段如何从源数据计算得到，关键属性包括 `bitable_field`、`sheet`、`type`、`field`、`condition`和是否允许缺失`optional`。其中对同一 `recog_id`，每个 `SUM bitable_field` 必须唯一，不允许多条规则共同累加同一输出字段。
 - **结构检验结果**: 表示 `run_recog_rollup --validate` 的输出，关键属性包括
   检测项名称、通过状态和异常详细信息。
 - **结果文件**: 表示 `run_recog_rollup --preview` 生成并供

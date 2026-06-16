@@ -277,7 +277,10 @@ def as_number(value: Any) -> float | None:
 def _normalize_numeric_text(value: Any) -> str:
     """规范化常见财务文本数值格式。"""
 
-    return str(value).replace(",", "").replace("`", "").strip()
+    normalized = str(value).replace(",", "").replace("`", "").strip()
+    if re.fullmatch(r"[-—–－]+", normalized):
+        return "0"
+    return normalized
 
 
 def period_of(value: Any) -> str | None:

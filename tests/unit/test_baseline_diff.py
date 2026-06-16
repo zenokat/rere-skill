@@ -86,3 +86,31 @@ def test_compare_preview_to_baseline_treats_numeric_strings_as_equal_values() ->
 
     assert report.matched is True
     assert report.differences == []
+
+
+def test_compare_preview_to_baseline_unifies_parenthesis_variants_in_keys() -> None:
+    """联合键中的全角/半角括号差异应被视为同一业务键。"""
+
+    preview_records = [
+        {
+            "期间": "202605",
+            "平台ID": "蔡林记（积玉桥店）",
+            "服务费": -1.76,
+        }
+    ]
+    baseline_records = [
+        {
+            "期间": 202605,
+            "平台ID": "蔡林记(积玉桥店)",
+            "服务费": "-1.76",
+        }
+    ]
+
+    report = compare_preview_to_baseline(
+        preview_records=preview_records,
+        baseline_records=baseline_records,
+        key_fields=["期间", "平台ID"],
+    )
+
+    assert report.matched is True
+    assert report.differences == []

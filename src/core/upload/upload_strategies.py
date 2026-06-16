@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
+
+from utils.text_normalization import normalize_display_text
 
 
 def build_upsert_key(record_fields: dict[str, Any], group_fields: list[str], period_field: str = "期间") -> tuple[Any, ...]:
@@ -31,7 +34,16 @@ def _normalize_compare_value(value: Any) -> Any:
         return None
     if isinstance(value, str):
         stripped = value.strip()
-        return stripped or None
+        if not stripped:
+            return None
+        normalized_text = normalize_display_text(stripped)
+        parsed_numeric = _try_parse_decimal(normalized_text)
+        if parsed_numeric is not None:
+            numeric = float(parsed_numeric)
+            if numeric.is_integer():
+                return int(numeric)
+            return round(numeric, 2)
+        return normalized_text
     if isinstance(value, bool):
         return value
     if isinstance(value, (int, float)):
@@ -56,3 +68,15 @@ def _normalize_key_value(value: Any) -> Any:
     if isinstance(normalized, str):
         return normalized
     return str(normalized)
+
+
+def _try_parse_decimal(value: str) -> Decimal | None:
+    """Try to parse a plain numeric string for stable record comparison."""
+
+    candidate = value.replace(",", "")
+    if not candidate:
+        return None
+    try:
+        return Decimal(candidate)
+    except Exception:  # noqa: BLE001
+        return None

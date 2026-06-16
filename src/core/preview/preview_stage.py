@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from core.rules.project_patches import apply_project_patches
+from core.rules.rule_bundle_guard import ensure_rule_bundle_supported
 from core.rules.rule_engine import build_prepared_condition, coerce_numeric_value, evaluate_condition, prepare_compiled_condition
 from core.rules.rule_repository import FeishuRuleRepository
 from core.source_resolver import (
@@ -47,7 +48,9 @@ class PreviewStageImpl:
         """执行试算。"""
 
         source_files = discover_source_files(source_file)
-        rule_bundle = apply_project_patches(self._rule_repository.load_rule_bundle(recog_id))
+        rule_bundle = ensure_rule_bundle_supported(
+            apply_project_patches(self._rule_repository.load_rule_bundle(recog_id))
+        )
         group_rules = self._dedupe_output_rules([rule for rule in rule_bundle.rollup_rules if rule.type == "GROUP"])
         sum_rules = [rule for rule in rule_bundle.rollup_rules if rule.type == "SUM"]
         group_fields = [rule.bitable_field for rule in group_rules]
@@ -205,7 +208,7 @@ class PreviewStageImpl:
             matches = find_rule_matches(dataset=dataset, category=rule.category, field=rule.field)
             if not matches:
                 if rule.optional:
-                    rule_columns[(rule.sheet, rule.bitable_field)] = None
+                    rule_columns[_rule_column_key(rule)] = None
                     continue
                 issues.append(
                     PreviewIssue(
@@ -226,7 +229,7 @@ class PreviewStageImpl:
                     )
                 )
                 continue
-            rule_columns[(rule.sheet, rule.bitable_field)] = matches[0]
+            rule_columns[_rule_column_key(rule)] = matches[0]
         return rule_columns
 
     @staticmethod
@@ -253,7 +256,7 @@ class PreviewStageImpl:
             execution_plans.append(
                 SumExecutionPlan(
                     rule=rule,
-                    column=rule_columns.get((rule.sheet, rule.bitable_field)),
+                    column=rule_columns.get(_rule_column_key(rule)),
                     compiled_condition=compiled_condition,
                 )
             )
@@ -265,7 +268,7 @@ class PreviewStageImpl:
 
         row_group_values: dict[str, Any] = {}
         for rule in group_rules:
-            column = rule_columns.get((rule.sheet, rule.bitable_field))
+            column = rule_columns.get(_rule_column_key(rule))
             if column is None:
                 row_group_values[rule.bitable_field] = None
                 continue
@@ -341,3 +344,9 @@ class PreviewStageImpl:
                 current[field_name] = float(current.get(field_name, 0.0)) + float(value or 0.0)
 
         return list(merged_records.values())
+
+
+def _rule_column_key(rule: RollupRule) -> tuple[str, str, str]:
+    """为规则命中的源列生成稳定键。"""
+
+    return (rule.type, rule.sheet, rule.bitable_field)

@@ -8,6 +8,8 @@ from __future__ import annotations
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
+from utils.text_normalization import normalize_display_text
+
 
 def normalize_scalar(value: Any, digits: int = 2) -> Any:
     """归一化单个标量值，尽量消除格式噪声。"""
@@ -22,7 +24,7 @@ def normalize_scalar(value: Any, digits: int = 2) -> Any:
         if parsed_numeric is not None:
             quantized = parsed_numeric.quantize(Decimal("1." + "0" * digits), rounding=ROUND_HALF_UP)
             return float(quantized)
-        return stripped
+        return normalize_display_text(stripped)
     if isinstance(value, bool):
         return value
     if isinstance(value, (int, float, Decimal)):

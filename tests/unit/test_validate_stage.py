@@ -74,6 +74,24 @@ class _FakeSettings:
     result_bitable_app_token = "dummy-app-token"
 
 
+def _build_service(bundle: RuleBundle, bitable_client: object) -> ValidateStageImpl:
+    """构造结构检验阶段测试对象。"""
+
+    return ValidateStageImpl(
+        catalog_repository=_FakeCatalogRepository(
+            RecognitionProject(
+                recog_id="demo_recog",
+                recog_name="演示项目",
+                bitable_table_id="tbl-demo",
+                bitable_table_exists=True,
+            )
+        ),
+        rule_repository=_FakeRuleRepository(bundle),
+        bitable_client=bitable_client,  # type: ignore[arg-type]
+        settings=_FakeSettings(),  # type: ignore[arg-type]
+    )
+
+
 def test_validate_stage_reports_condition_placeholder_with_structured_code() -> None:
     """condition 仍是占位符时，应返回清晰的结构化错误信息。"""
 
@@ -115,19 +133,7 @@ def test_validate_stage_reports_condition_placeholder_with_structured_code() -> 
         ],
     )
 
-    service = ValidateStageImpl(
-        catalog_repository=_FakeCatalogRepository(
-            RecognitionProject(
-                recog_id="demo_recog",
-                recog_name="演示项目",
-                bitable_table_id="tbl-demo",
-                bitable_table_exists=True,
-            )
-        ),
-        rule_repository=_FakeRuleRepository(bundle),
-        bitable_client=_FakeBitableClient(),
-        settings=_FakeSettings(),  # type: ignore[arg-type]
-    )
+    service = _build_service(bundle, _FakeBitableClient())
 
     with pytest.raises(CliExecutionError) as exc_info:
         service.run("demo_recog", source_file)
@@ -181,20 +187,68 @@ def test_validate_stage_accepts_single_select_group_target_field() -> None:
         ],
     )
 
-    service = ValidateStageImpl(
-        catalog_repository=_FakeCatalogRepository(
-            RecognitionProject(
-                recog_id="demo_recog",
-                recog_name="演示项目",
-                bitable_table_id="tbl-demo",
-                bitable_table_exists=True,
-            )
-        ),
-        rule_repository=_FakeRuleRepository(bundle),
-        bitable_client=_SingleSelectGroupBitableClient(),
-        settings=_FakeSettings(),  # type: ignore[arg-type]
-    )
+    service = _build_service(bundle, _SingleSelectGroupBitableClient())
 
     response = service.run("demo_recog", source_file)
 
     assert response.error_count == 0
+
+
+def test_validate_stage_rejects_duplicate_sum_output_fields() -> None:
+    """同一 SUM 输出字段对应多条规则时，应直接阻断。"""
+
+    tmp_dir = Path.cwd() / "tests" / "_tmp_validate_stage" / uuid4().hex
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    source_file = tmp_dir / "source.csv"
+    source_file.write_text(
+        "门店,佣金,配送服务费\n"
+        "华北一店,7.76,9.79\n",
+        encoding="utf-8",
+    )
+
+    bundle = RuleBundle(
+        recog_id="demo_recog",
+        source_sheets=[
+            SourceSheetSpec(
+                recog_id="demo_recog",
+                sheet="DEFAULT",
+                field_row=1,
+                last_row=-1,
+            )
+        ],
+        rollup_rules=[
+            RollupRule(
+                recog_id="demo_recog",
+                bitable_field="门店",
+                type="GROUP",
+                sheet="DEFAULT",
+                field="门店",
+            ),
+            RollupRule(
+                recog_id="demo_recog",
+                bitable_field="平台服务费",
+                type="SUM",
+                sheet="DEFAULT",
+                field="佣金",
+            ),
+            RollupRule(
+                recog_id="demo_recog",
+                bitable_field="平台服务费",
+                type="SUM",
+                sheet="DEFAULT",
+                field="配送服务费",
+            ),
+        ],
+    )
+
+    service = _build_service(bundle, _FakeBitableClient())
+
+    with pytest.raises(CliExecutionError) as exc_info:
+        service.run("demo_recog", source_file)
+
+    payload = exc_info.value.response.model_dump(mode="json")
+
+    assert payload["stage"] == "validate"
+    assert "同一 SUM 输出字段不允许对应多条汇总规则" in payload["message"]
+    assert payload["details"][0]["bitable_field"] == "平台服务费"
+    assert payload["details"][0]["rule_count"] == 2

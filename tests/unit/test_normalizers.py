@@ -25,3 +25,11 @@ def test_normalize_record_trims_strings_and_converts_blank_to_none() -> None:
 
     assert normalized["门店"] == "武汉中南店"
     assert normalized["备注"] is None
+
+
+def test_normalize_record_unifies_fullwidth_parentheses() -> None:
+    """全角/半角括号差异不应造成业务文本不一致。"""
+
+    normalized = normalize_record({"门店": " 蔡林记（积玉桥店） "})
+
+    assert normalized["门店"] == "蔡林记(积玉桥店)"

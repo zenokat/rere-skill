@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 from integrations.feishu_bitable.client import BitableApiClient
 from integrations.feishu_bitable.field_values import flatten_feishu_fields
+
+
+@dataclass
+class _FieldMetadataCache:
+    """缓存单次仓库实例内的目标表字段元数据。"""
+
+    field_items_by_table: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    period_field_type_by_table: dict[str, int | None] = field(default_factory=dict)
+    field_types_by_table: dict[str, dict[str, int]] = field(default_factory=dict)
 
 
 class FeishuUploadRepository:
@@ -16,6 +26,7 @@ class FeishuUploadRepository:
 
         self._client = client
         self._result_bitable_app_token = result_bitable_app_token
+        self._field_metadata_cache = _FieldMetadataCache()
 
     def list_records(self, table_id: str) -> list[dict[str, Any]]:
         """列出目标表记录。"""
@@ -69,22 +80,43 @@ class FeishuUploadRepository:
     def _lookup_period_field_type(self, table_id: str) -> int | None:
         """读取目标表 `期间` 字段类型。"""
 
-        field_items = self._client.list_fields(self._result_bitable_app_token, table_id)
+        cached = self._field_metadata_cache.period_field_type_by_table.get(table_id)
+        if table_id in self._field_metadata_cache.period_field_type_by_table:
+            return cached
+        field_items = self._list_field_items(table_id)
         for field_item in field_items:
             if field_item.get("field_name") == "期间":
                 field_type = field_item.get("type")
-                return field_type if isinstance(field_type, int) else None
+                resolved = field_type if isinstance(field_type, int) else None
+                self._field_metadata_cache.period_field_type_by_table[table_id] = resolved
+                return resolved
+        self._field_metadata_cache.period_field_type_by_table[table_id] = None
         return None
 
     def _lookup_field_types(self, table_id: str) -> dict[str, int]:
         """读取目标表字段类型映射。"""
 
-        field_items = self._client.list_fields(self._result_bitable_app_token, table_id)
-        return {
+        cached = self._field_metadata_cache.field_types_by_table.get(table_id)
+        if cached is not None:
+            return cached
+        field_items = self._list_field_items(table_id)
+        field_types = {
             str(field_item.get("field_name")): int(field_item.get("type"))
             for field_item in field_items
             if field_item.get("field_name") is not None and isinstance(field_item.get("type"), int)
         }
+        self._field_metadata_cache.field_types_by_table[table_id] = field_types
+        return field_types
+
+    def _list_field_items(self, table_id: str) -> list[dict[str, Any]]:
+        """读取并缓存整张表的字段元数据。"""
+
+        cached = self._field_metadata_cache.field_items_by_table.get(table_id)
+        if cached is not None:
+            return cached
+        field_items = self._client.list_fields(self._result_bitable_app_token, table_id)
+        self._field_metadata_cache.field_items_by_table[table_id] = field_items
+        return field_items
 
     @staticmethod
     def _build_period_filter_value(*, period: int | str, field_type: int | None) -> int | str:

@@ -10,6 +10,7 @@ from core.rules.rule_engine import (
     ConditionIdentifierUnresolvedError,
     ConditionInvalidFCallError,
     ConditionPlaceholderError,
+    as_number,
     build_prepared_condition,
     coerce_numeric_value,
     evaluate_condition,
@@ -146,3 +147,24 @@ def test_coerce_numeric_value_accepts_backtick_prefixed_numeric_string() -> None
     )
 
     assert coerce_numeric_value(rule, "`157.80") == 157.8
+
+
+def test_coerce_numeric_value_treats_dash_placeholder_as_zero() -> None:
+    """纯占位符短横线应按 0 处理，而不是触发 float 转换失败。"""
+
+    rule = RollupRule(
+        recog_id="meituan_delivery_settlement",
+        bitable_field="实际回款",
+        type="SUM",
+        sheet="DEFAULT",
+        field="商家应收款",
+        optional=False,
+    )
+
+    assert coerce_numeric_value(rule, "-") == 0.0
+
+
+def test_as_number_treats_dash_placeholder_as_zero() -> None:
+    """通用数值归一化也应把短横线占位符视为 0。"""
+
+    assert as_number("-") == 0.0

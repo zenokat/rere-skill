@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import uuid4
 
+from openpyxl import Workbook
+
 from core import source_resolver
 from models.domain import SourceSheetSpec
 
@@ -124,3 +126,140 @@ def test_build_sheet_dataset_skips_blank_csv_rows() -> None:
     assert "门店编号" in fields
     assert "商家实收（元）" in fields
     assert dataset.data_rows[0][("", "门店编号")] == "1001"
+
+
+def test_build_sheet_dataset_reads_gb18030_csv() -> None:
+    """常见中文账单 CSV 即使不是 UTF-8，也应能被稳定读取。"""
+
+    tmp_dir = _make_tmp_dir()
+    source_file = tmp_dir / "meituan-demo.csv"
+    source_file.write_text(
+        "日期,门店名称,商品原价\n"
+        "2026-05-01,蔡林记,12.50\n",
+        encoding="gb18030",
+    )
+
+    dataset = source_resolver.build_sheet_dataset(
+        source_file,
+        SourceSheetSpec(recog_id="demo", sheet="DEFAULT", field_row=1, last_row=-1),
+    )
+
+    row = dataset.data_rows[0]
+    assert row[("", "日期")] == "2026-05-01"
+    assert row[("", "门店名称")] == "蔡林记"
+    assert row[("", "商品原价")] == "12.50"
+
+
+def test_streaming_sheet_dataset_skips_blank_excel_rows() -> None:
+    """大 Excel 的流式读取应跳过尾部全空白数据行。"""
+
+    tmp_dir = _make_tmp_dir()
+    source_file = tmp_dir / "meituan-summary.xlsx"
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "按门店"
+    worksheet.append(["门店名称", "服务费"])
+    worksheet.append(["蔡林记", "12.50"])
+    worksheet.append([None, None])
+    worksheet.append([None, None])
+    workbook.save(source_file)
+    workbook.close()
+
+    original_threshold = source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD
+    source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = 0
+    try:
+        dataset = source_resolver.build_sheet_dataset(
+            source_file,
+            SourceSheetSpec(recog_id="demo", sheet="按门店", field_row=1, last_row=-1),
+            stream_to_end=True,
+        )
+        rows = list(dataset.iter_data_rows())
+    finally:
+        source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = original_threshold
+
+    assert len(rows) == 1
+    assert rows[0][0] == 2
+    assert rows[0][1][("", "门店名称")] == "蔡林记"
+    assert rows[0][1][("", "服务费")] == "12.50"
+
+
+def test_non_streaming_sheet_dataset_skips_blank_excel_rows() -> None:
+    """普通 xlsx 解析路径也应跳过尾部全空白数据行。"""
+
+    tmp_dir = _make_tmp_dir()
+    source_file = tmp_dir / "meituan-summary-small.xlsx"
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "按门店"
+    worksheet.append(["门店名称", "服务费"])
+    worksheet.append(["蔡林记", "12.50"])
+    worksheet.append([None, None])
+    worksheet.append([None, None])
+    workbook.save(source_file)
+    workbook.close()
+
+    dataset = source_resolver.build_sheet_dataset(
+        source_file,
+        SourceSheetSpec(recog_id="demo", sheet="按门店", field_row=1, last_row=-1),
+    )
+
+    assert dataset.data_row_numbers == [2]
+    assert len(dataset.data_rows) == 1
+    assert dataset.data_rows[0][("", "门店名称")] == "蔡林记"
+    assert dataset.data_rows[0][("", "服务费")] == "12.50"
+
+
+def test_streaming_sheet_dataset_allows_header_only_excel_when_last_row_is_to_end() -> None:
+    """只有表头、没有数据体的大 Excel 分片应被视为零行数据集，而不是报空区间错误。"""
+
+    tmp_dir = _make_tmp_dir()
+    source_file = tmp_dir / "jingdong-header-only.xlsx"
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "com.jd.o2o.settlement.domain.dt"
+    worksheet.append(["商家基础信息", None, None])
+    worksheet.append(["商家编号", "商家名称", "门店编号"])
+    workbook.save(source_file)
+    workbook.close()
+
+    original_threshold = source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD
+    source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = 0
+    try:
+        dataset = source_resolver.build_sheet_dataset(
+            source_file,
+            SourceSheetSpec(recog_id="demo", sheet="com.jd.o2o.settlement.domain.dt", field_row=2, last_row=-1),
+            stream_to_end=True,
+        )
+    finally:
+        source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = original_threshold
+
+    assert dataset.first_data_row is None
+    assert dataset.first_data_row_number is None
+    assert list(dataset.iter_data_rows()) == []
+
+
+def test_prepare_read_only_worksheet_resets_stale_dimensions_even_when_max_row_is_not_one() -> None:
+    """只读 worksheet 即使暴露出的 max_row 不是 1，也应主动重算失真的 dimension。"""
+
+    class _FakeWorksheet:
+        def __init__(self) -> None:
+            self.max_row = 8
+            self.reset_calls = 0
+            self.calculate_calls: list[bool] = []
+
+        def reset_dimensions(self) -> None:
+            self.reset_calls += 1
+
+        def calculate_dimension(self, force: bool = False) -> str:
+            self.calculate_calls.append(force)
+            return "A1:BH162747"
+
+    worksheet = _FakeWorksheet()
+
+    source_resolver._prepare_read_only_worksheet(worksheet, force_calculate=True)
+
+    assert worksheet.reset_calls == 1
+    assert worksheet.calculate_calls == [True]
