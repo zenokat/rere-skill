@@ -159,3 +159,9 @@
 
 如果本轮结论是 `业务TBD` 或 `blocked`，必须把停止原因直接写进 `result` 或 `notes`，
 让下一位接手的人不用重新撞一次墙。
+
+## Regression Closure
+
+- 2026-06-18 已完成 14/14 个注册项目的 `validate + preview + 202605 baseline` 回归覆盖，详见仓库根目录的 `rollup_regression_notes.md`
+- 当前 `iteration-progress.md` 继续承担“逐项目迭代证据沉淀”的职责；全量回归轮次与跨项目差异汇总则沉淀在独立的回归记录中
+- 这意味着本特性已完成核心实现与项目级打磨，后续若再有规则、配置或上传逻辑改动，应同时参考本文件中的稳定回归集合和 `rollup_regression_notes.md` 中的全局回归结论

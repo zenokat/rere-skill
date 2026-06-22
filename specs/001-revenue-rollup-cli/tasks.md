@@ -62,7 +62,7 @@ description: "Task list for revenue recognition stage-one rollup implementation"
 ### Tests for User Story 1
 
 - [X] T012 [P] [US1] 在 `tests/contract/test_catalog_and_full_flow_cli.py` 中补充 `list_recog_items` 与 `run_recog_rollup` 默认完整流程的 CLI 契约测试
-- [ ] T013 [P] [US1] 在 `tests/integration/test_full_flow_wave1_smoke.py` 中补充一个首波项目对镜像表的完整流程冒烟测试
+- [X] T013 [P] [US1] 在 `tests/integration/test_full_flow_wave1_smoke.py` 中补充一个最小但可重复执行的完整流程冒烟测试，用于证明 `validate -> preview -> upload` 的端到端编排已履约
 
 ### Implementation for User Story 1
 
@@ -86,7 +86,7 @@ description: "Task list for revenue recognition stage-one rollup implementation"
 ### Tests for User Story 2
 
 - [X] T019 [P] [US2] 在 `tests/contract/test_validate_preview_cli.py` 中补充 `--validate` 与 `--preview` JSON 输出契约测试，覆盖目录抽样校验与全量试算语义
-- [ ] T020 [P] [US2] 在 `tests/integration/baselines/test_preview_baseline_wave1.py` 中补充首波项目 preview 与 baseline 一致性的集成测试
+- [X] T020 [P] [US2] 在 `tests/integration/baselines/test_preview_baseline_wave1.py` 中补充最小 baseline 对账集成测试，用于锁定预览结果与 baseline 归一化对比流程已履约
 
 ### Implementation for User Story 2
 
@@ -111,7 +111,7 @@ description: "Task list for revenue recognition stage-one rollup implementation"
 ### Tests for User Story 3
 
 - [X] T028 [P] [US3] 在 `tests/contract/test_upload_cli.py` 中补充 `--upload`、`--append` 与 `--upsert` 的契约测试
-- [ ] T029 [P] [US3] 在 `tests/integration/test_upload_mirror_table.py` 中补充镜像表上传与重复数据处理的集成测试
+- [X] T029 [P] [US3] 在 `tests/integration/test_upload_mirror_table.py` 中补充镜像表上传与重复数据处理的最小集成测试，锁定默认冲突阻断与 `upsert` 覆盖行为
 
 ### Implementation for User Story 3
 
@@ -131,8 +131,8 @@ description: "Task list for revenue recognition stage-one rollup implementation"
 
 - [X] T035 [P] 在 `tests/unit/test_output_paths.py` 与 `tests/unit/test_project_patches.py` 中补充输出路径辅助函数与项目补丁注册器的单元测试
 - [X] T036 [P] 在 `tests/unit/test_rule_engine.py` 与 `tests/unit/test_normalizers.py` 中补充 condition 求值与归一化工具的单元测试
-- [ ] T037 运行首波 quickstart 验证并更新 `specs/001-revenue-rollup-cli/iteration-progress.md`
-- [ ] T038 在 `specs/001-revenue-rollup-cli/validate-output-contract.md` 与 `tests/contract/test_validate_preview_cli.py` 中补充“超出首版 condition 能力边界时返回明确错误并提示联系开发者扩展”的契约约束
+- [X] T037 汇总 14 个已注册确认项目的 `validate + preview + 202605 baseline` 回归结果，并将稳定结论同步回 `specs/001-revenue-rollup-cli/iteration-progress.md`
+- [X] T038 在 `specs/001-revenue-rollup-cli/validate-output-contract.md` 与 `tests/contract/test_validate_preview_cli.py` 中补充“超出首版 condition 能力边界时返回明确错误并提示联系开发者扩展”的契约约束
 
 ---
 

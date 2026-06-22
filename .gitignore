@@ -20,9 +20,11 @@ Thumbs.db
 .DS_Store
 .tmp/
 goal.md
-_tmp_validate_stage/
 sandbox-rules-allow-list.md
 goals/
 environment.md
 .codex/
 _tmp_source_resolver/
+rollup_regression_notes.md
+tests/_**/
+**prompt**.md

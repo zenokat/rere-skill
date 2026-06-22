@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-05
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "开发一个供Agent使用的，通过CLI方式调用的，财务收入流水数据汇总工具脚本。根据汇总规则表中配置的汇总规则，按照GROUP字段对SUM字段做条件汇总，计算生成Excel表格，作为财务上确认收入或回款的依据，并且上传专门的数据库（另一个飞书多维表）做留存。"
 

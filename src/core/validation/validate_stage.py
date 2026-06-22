@@ -43,6 +43,15 @@ PERIOD_ALLOWED_FIELD_TYPES = {1, 2}
 class ValidateStageImpl:
     """执行结构检验。"""
 
+    _CONDITION_BOUNDARY_CODES = {
+        "condition_placeholder_detected",
+        "condition_parse_failed",
+        "condition_ast_not_allowed",
+        "condition_function_not_allowed",
+        "condition_invalid_f_call",
+        "condition_identifier_unresolved",
+    }
+
     def __init__(
         self,
         catalog_repository: ProjectCatalogRepository,
@@ -268,22 +277,26 @@ class ValidateStageImpl:
                             )
                         )
                     except ConditionEvaluationError as exc:
+                        detail_payload = {
+                            "sampled_source_file": str(sampled_source_file),
+                            "sheet": source_spec.sheet,
+                            "bitable_field": rule.bitable_field,
+                            "condition": rule.condition,
+                            "code": exc.code,
+                            "exception_type": type(exc).__name__,
+                        }
+                        if exc.code in self._CONDITION_BOUNDARY_CODES:
+                            detail_payload["agent_action"] = "contact_developer_for_condition_extension"
+                            detail_payload["guidance"] = (
+                                "当前 condition 超出首版能力边界，请联系开发者扩展内置 helper 或 condition 能力。"
+                            )
                         checks.append(
                             ValidationCheckResult(
                                 check_name="condition_valid",
                                 scope=f"rule:{rule.bitable_field}",
                                 passed=False,
                                 message=str(exc),
-                                details=[
-                                    {
-                                        "sampled_source_file": str(sampled_source_file),
-                                        "sheet": source_spec.sheet,
-                                        "bitable_field": rule.bitable_field,
-                                        "condition": rule.condition,
-                                        "code": exc.code,
-                                        "exception_type": type(exc).__name__,
-                                    }
-                                ],
+                                details=[detail_payload],
                             )
                         )
                     except Exception as exc:  # noqa: BLE001
