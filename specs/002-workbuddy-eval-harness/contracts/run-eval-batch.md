@@ -37,6 +37,9 @@
 | `--capture_transcript` | flag | 是否保存 `stream-json` transcript |
 | `--enable_otel` | flag | 是否开启 OTel trace 导出 |
 | `--promote_baseline` | string | 运行成功后直接生成基线名称 |
+| `--workspace_root` | path | case 独立工作目录根路径 |
+| `--cleanup_workspaces` | flag | 运行结束后清理临时工作目录 |
+| `--write_policy` | string | `read_only`、`safe_only`、`approved_write` |
 
 ## Runner Behavior
 
@@ -46,6 +49,9 @@
 2. 无头执行默认通过 CodeBuddy CLI `-p` 发起。
 3. 若任务涉及授权动作，runner 必须只在受信场景下为底层 CLI 注入 `-y`。
 4. 即使单个 case 失败，整批运行也要尽量完成其余 case，并在批次摘要中给出完整状态。
+5. 每条 case 还必须生成独立 `workspace_dir`，不得复用其他 case 的运行目录。
+6. 当 `write_policy=read_only` 时，runner 必须阻断 upload 或真实外部写动作。
+7. 当 case 声明需要安全写环境时，runner 必须先校验环境，再决定是否放行。
 
 ## Exit Codes
 
@@ -55,6 +61,7 @@
 | `1` | 用法错误或 harness 内部错误 |
 | `2` | 批次完成，但存在 unexpected failure / regression |
 | `3` | 运行环境阻断到无法形成可靠评测结果 |
+| `4` | 安全策略阻断了被禁止的写操作 |
 
 ## Stdout Contract
 
@@ -95,9 +102,19 @@
         ├── stderr.txt
         ├── final.json
         ├── transcript.jsonl        # 可选
+        ├── workspace/              # 独立运行工作目录或其引用
         ├── evidence.md
         └── scorecard.json
 ```
+
+## Isolation And Safety Rules
+
+首版批量运行入口必须遵守以下规则：
+
+- 不同 case 之间不得共享工作目录
+- 评分只读取本次 `run_id` 目录中的证据
+- 未声明安全环境的 case，默认视为只读评测
+- 若被测 Agent 试图触发 upload 或真实外部写操作，且当前不满足 `approved_write` 条件，应直接阻断并记录为安全策略阻断
 
 ## Failure Classification Rules
 

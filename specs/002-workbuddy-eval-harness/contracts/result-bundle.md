@@ -50,6 +50,8 @@
 | `case_id` | string | case 标识 |
 | `run_id` | string | 本次运行标识 |
 | `session_id` | string? | 会话 ID |
+| `workspace_dir` | string | 本次 case 独立工作目录 |
+| `cleanup_status` | string | 工作目录清理状态 |
 | `status` | string | 运行状态 |
 | `outcome_class` | string | 结果分类 |
 | `failure_source` | string? | 失败归因 |
@@ -67,6 +69,7 @@
 |---|---|---|
 | `total_score` | number | 总分 |
 | `final_verdict` | string | 最终结论 |
+| `grader_outputs` | list[object] | 评分器原始输出 |
 | `dimensions` | list[object] | 逐维度分数、理由、grader 类型 |
 | `evidence_gaps` | list[string] | 影响评分的证据缺口 |
 
@@ -90,6 +93,14 @@
 - `failed`: 证据采集失败，无法可靠评分
 
 不要把 `partial` 默默伪装成完整成功。
+
+## Grader Compatibility Rule
+
+结果包必须允许同时容纳默认评分器和扩展评分器：
+
+- 默认评分器输出要稳定可比较
+- 扩展评分器输出可以增量增加，但必须带 `grader_id` 和 `version`
+- baseline compare 发现评分器集合或版本发生变化时，必须把该差异纳入可比性判断
 
 ## Human + Agent Dual Consumption Rule
 

@@ -9,13 +9,14 @@
 本 feature 要交付一套面向 Agent 的评测底座，用来对运行在 WorkBuddy / CodeBuddy 同核
 环境中的收入确认 skill 做可重复、可批量、可对比的自动化评测。首版采用
 CodeBuddy CLI 官方无头模式作为自动化执行面，围绕稳定 case 清单、批量运行器、证据包、
-自动评分卡、基线快照和回归视图建立统一产物契约。
+自动评分卡、评分器配置、隔离工作目录、基线快照和回归视图建立统一产物契约。
 
 设计重点不是“把一次脚本跑通”，而是把评测闭环搭成长期资产：
 
 - 同一组 case 可以被重复重跑，并保留稳定身份。
 - 每次运行都会落下结构化结果、证据引用和失败归因。
-- 评分以确定性规则为主，以 Rubric 和人工校准为辅。
+- 评分以受控注册的确定性评分器为主，以 Rubric 和人工校准为辅。
+- 每条 case 在独立工作目录中执行，默认只读，并通过显式安全闸门阻断真实外部写风险。
 - 首版优先覆盖收入确认 SOP 第 3 步“汇总”的 validate / preview 场景。
 - upload 仅在 case 明确声明安全环境时才进入评测范围。
 
@@ -41,7 +42,7 @@ CodeBuddy CLI 官方无头模式作为自动化执行面，围绕稳定 case 清
 - 需要结构化输出，首版标准输出为 `json`，深度留痕时补充 `stream-json`。
 - 官方文档要求：无头执行若涉及文件读写、命令执行、网络请求等授权动作，需在受信环境下显式带 `-y/--dangerously-skip-permissions`。
 - 评分应优先看结果和关键守卫，而不是僵硬检查完整工具路径。
-- trial 之间必须隔离，不能让上一轮遗留产物影响下一轮结果。
+- trial 之间必须隔离，不能让上一轮会话、临时文件或外部副作用影响下一轮结果。
 - telemetry 默认应最小化，prompt 内容、工具参数和工具内容记录都必须保持 opt-in。
 - 未显式声明安全环境的 case 不得默认触发 upload 风险。
 
@@ -133,10 +134,12 @@ Phase 0 已将以下关键不确定项收敛到 [research.md](./research.md)：
 首版 runner 负责读取稳定 case 清单，并为每个 case 生成独立 trial：
 
 1. 读取 suite manifest 与默认/扩展设置。
-2. 为每个 case 计算唯一 `run_id` 与隔离输出目录。
-3. 通过 CodeBuddy CLI 无头模式发起运行，标准输出使用 `json`。
-4. 当需要更深证据时，额外保存 `stream-json` transcript 或开启 OTel trace。
-5. 将执行结果归类为：通过、正确止步、环境失败、证据不足、skill/工具失败、harness 失败。
+2. 为每个 case 计算唯一 `run_id`，并创建独立 `workspace_dir` 与结果目录。
+3. 按 `workspace_mode` 将输入材料显式 materialize 到该目录，避免共享运行上下文。
+4. 通过 CodeBuddy CLI 无头模式发起运行，标准输出使用 `json`。
+5. 当需要更深证据时，额外保存 `stream-json` transcript 或开启 OTel trace。
+6. 按写策略和安全环境声明决定是否允许外部写动作。
+7. 将执行结果归类为：通过、正确止步、环境失败、证据不足、skill/工具失败、harness 失败。
 
 ### 2. Evidence Design
 
@@ -149,7 +152,9 @@ Phase 0 已将以下关键不确定项收敛到 [research.md](./research.md)：
 
 ### 3. Grader Design
 
-评分采用三层结构：
+评分采用“注册评分器 + 配置装配 + 统一评分卡”的设计。
+
+评分器结构分三层：
 
 - 确定性评分器：负责结果分类、必需字段、关键边界、必需/禁止行为、证据完整性、环境失败识别。
 - Rubric 评分器：负责任务理解、结果解读、摘要质量等较软维度，输出结构化理由。
@@ -157,7 +162,75 @@ Phase 0 已将以下关键不确定项收敛到 [research.md](./research.md)：
 
 评分强调“结果和关键约束”而不是“完整路径照搬”。例如：如果 case 的正确行为是澄清、阻断或拒绝越界执行，只要边界与结论正确，就应视为通过。
 
-### 4. Baseline Design
+评分器装配方式如下：
+
+1. 每个 `ScoreDimension` 必须绑定到一个具体 `grader_id`。
+2. `EvalSettingsProfile` 负责声明本轮启用哪些评分器、执行顺序和是否为默认评分器。
+3. 评分执行顺序固定为：
+   - 先运行确定性评分器，产出硬门禁结果与关键标签
+   - 再运行 Rubric 评分器，补足软维度理由
+   - 最后仅在需要时挂入人工复核结论
+4. `ScoreCard` 需要同时保存：
+   - 各评分器原始输出
+   - 汇总后维度分数
+   - 评分器版本
+   - 是否因证据缺失而降级评分
+
+首版评分器集合分成两类：
+
+- 默认评分器：随 harness 开箱即用，覆盖 `task_understanding`、`tool_selection`、`parameter_completeness`、`result_interpretation`、`failure_handling`、`boundary_compliance`
+- 扩展评分器：通过 `EvalSettingsProfile` 以增量方式挂入，例如新证据类型、新安全维度、新成本维度
+
+可自定义评分器通过受控配置插槽扩展，而不是任意脚本热插拔：
+
+- 新增评分器要先注册 `grader_id`
+- 声明输入依赖（读哪些证据）
+- 声明输出 schema（吐什么结构）
+- 再由 `EvalSettingsProfile` 决定是否启用
+
+这样既保留扩展能力，又保持结果可比、可审计和可回归。
+
+### 4. Isolation And Safety Design
+
+隔离与安全设计围绕“会话独立、目录独立、副作用受控”三个目标展开。
+
+环境隔离拆成三层：
+
+1. **会话隔离**
+   - 每条 case 独立 `session_id`
+   - 不复用上一条 case 的对话上下文
+
+2. **工作目录隔离**
+   - 每条 case 必须 materialize 到独立 `workspace_dir`
+   - 运行输入使用复制、链接或引用策略显式落入该目录
+   - harness 自己生成的中间文件、stdout/stderr、transcript 只写入该 case 目录
+   - 运行结束后必须产出 `cleanup_status`，说明临时目录是否已清理
+
+3. **副作用隔离**
+   - 默认使用只读/低权限工具集合
+   - 默认禁用 upload、真实外部写操作和不在白名单内的命令
+   - 只有 case 显式声明 `safe_environment_required=true` 且 runner 校验通过时，才允许进入写路径
+
+首版安全闸门至少包括：
+
+- `allow_write_operations=false` 时，不向底层 CLI 注入允许写外部系统的工具权限
+- `allow_upload=false` 时，任何尝试调用 upload 的行为都应在评分和运行控制中视为越界
+- 若 case 需要真实写环境，runner 必须先校验：
+  - 当前目标表是否为影子表 / 安全表
+  - 当前凭证是否属于受控环境
+  - 当前运行模式是否被显式批准
+- 若以上任一条件不成立，应直接阻断并归类为 `runtime_environment`，而不是冒险执行
+
+对本地残留的处理策略：
+
+- harness 不能假设工作区天然干净
+- 每个 case 的输入目录和输出目录必须分离
+- 评分只读取本次 `run_id` 目录下的证据，不读取“最近一次运行目录”
+- 若清理失败，应在结果中显式记录，但不能悄悄复用旧产物
+
+首版不以强虚拟化沙箱为前提，而是先建立“默认只读、独立目录、显式安全闸门、可审计副作用”四层防线。
+
+### 5. Baseline Design
 
 baseline 不是单纯保存一个分数，而是保存：
 
@@ -173,7 +246,7 @@ baseline 不是单纯保存一个分数，而是保存：
 - `unchanged`：无实质变化
 - `not_comparable`：版本差异或证据缺失导致不可比
 
-### 5. Failure Attribution Design
+### 6. Failure Attribution Design
 
 首版归因分类固定为四大类：
 
@@ -200,9 +273,9 @@ baseline 不是单纯保存一个分数，而是保存：
 
 实现阶段的核心验证分三层：
 
-- 契约层：manifest、batch result、baseline snapshot 的 JSON / 文件结构稳定可解析
-- 运行层：fake runner 与真实 headless runner 都能产出一致的主结果结构
-- 回归层：相同 case 重跑后能输出逐 case、逐评分维度的 diff，并正确标记新增问题与修复项
+- 契约层：manifest、评分器定义、batch result、baseline snapshot 的 JSON / 文件结构稳定可解析，且包含隔离目录、清理状态、评分器版本等关键字段
+- 运行层：fake runner 与真实 headless runner 都能产出一致的主结果结构；不同 case 会写入独立 `workspace_dir`；未声明安全环境时会阻断 upload 或真实外部写；默认评分器与扩展评分器能够按顺序执行并汇总为统一评分卡
+- 回归层：相同 case 重跑后能输出逐 case、逐评分维度的 diff，并正确标记新增问题与修复项；评分器版本、证据类型扩展和环境指纹变化会进入 baseline compare 的可比性判断
 
 ## Complexity Tracking
 

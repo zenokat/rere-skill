@@ -24,6 +24,7 @@ baselines/<baseline_id>/baseline.json
 | `prompt_version` | string? | prompt / 打包版本 |
 | `environment_fingerprint` | object | 运行环境指纹 |
 | `scorer_versions` | object | scorer 版本 |
+| `settings_profile_id` | string | 运行所用评测设置 |
 | `case_results` | list[object] | 逐 case 结果 |
 | `approval_status` | string | `draft`、`reviewed`、`promoted` |
 
@@ -39,6 +40,7 @@ baselines/<baseline_id>/baseline.json
 | `scorecard` | object | 冻结后的主评分结果 |
 | `failure_source` | string? | 若失败或正确止步，保留归因 |
 | `evidence_refs` | object | 关键证据引用 |
+| `workspace_policy` | object | 当时的环境隔离与写策略摘要 |
 
 ## Promotion Rule
 
@@ -77,3 +79,4 @@ baselines/<baseline_id>/baseline.json
 - `regressed` 视为 CI / 评审阻断信号
 - `not_comparable` 不应被静默忽略，必须在摘要里单独列出原因
 - `fixed` 和 `unchanged` 都应统计并进入聚合摘要
+- 当评分器版本、设置 profile 或环境隔离策略发生变化时，应优先评估是否需要标记为 `not_comparable`

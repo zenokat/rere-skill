@@ -25,6 +25,7 @@
 | `description` | string | no | 说明本套 case 的范围 |
 | `target` | object | yes | 被测目标 |
 | `default_settings_profile` | string | yes | 默认评测设置 |
+| `environment_policy` | object | no | 全套 case 默认环境隔离与写风险策略 |
 | `cases` | list[object] | yes | case 列表 |
 
 ## `target` Object
@@ -52,6 +53,19 @@
 | `safety` | object | no | 风险控制 |
 | `tags` | list[string] | no | 标签 |
 | `case_version` | string | no | 默认 `v1` |
+
+## `environment_policy` Object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `workspace_mode` | string | no | `per_case_copy`、`per_case_link`、`reference_only` |
+| `cleanup_required` | boolean | no | 是否要求运行后清理临时工作目录 |
+| `default_write_policy` | string | no | `read_only`、`safe_only` |
+
+说明：
+
+- 首版建议默认 `workspace_mode=per_case_copy` 或等价独立目录策略。
+- `default_write_policy=read_only` 表示即使 skill 想写外部系统，也默认不放行。
 
 ## `expectation` Object
 

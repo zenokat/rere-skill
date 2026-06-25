@@ -76,6 +76,8 @@
 | `command_line` | string | 实际调用命令 |
 | `permission_mode` | string | 本次运行的权限模式 |
 | `output_format` | enum | `json` 或 `stream-json` |
+| `workspace_dir` | path | 本次 case materialize 后的独立工作目录 |
+| `cleanup_status` | enum | `pending`、`cleaned`、`cleanup_failed` |
 | `status` | enum | `queued`、`running`、`completed`、`failed`、`inconclusive` |
 | `outcome_class` | enum | `pass`、`correct_stop`、`environment_failure`、`skill_failure`、`harness_failure`、`evidence_missing` |
 | `failure_source` | enum? | `skill_behavior`、`wrapped_tool`、`runtime_environment`、`harness_system` |
@@ -106,6 +108,19 @@
 - `collection_status=partial` 不等于 skill 失败；它首先是证据层状态。
 - `score_impact` 用于说明证据缺失是否妨碍自动评分。
 
+### GraderDefinition
+
+表示一个可注册的评分器定义。
+
+| Field | Type | Description |
+|---|---|---|
+| `grader_id` | string | 评分器主键 |
+| `grader_type` | enum | `deterministic`、`rubric`、`human` |
+| `version` | string | 评分器版本 |
+| `input_requirements` | list[string] | 该评分器依赖哪些证据 |
+| `output_schema` | object | 评分器输出结构定义 |
+| `default_enabled` | boolean | 是否属于首版默认评分器 |
+
 ### ScoreDimension
 
 表示一个评分维度定义。
@@ -114,6 +129,7 @@
 |---|---|---|
 | `dimension_id` | string | 维度主键 |
 | `name` | string | 维度名称 |
+| `grader_id` | string | 负责该维度的评分器 |
 | `grader_type` | enum | `deterministic`、`rubric`、`human` |
 | `weight` | number | 权重 |
 | `required` | boolean | 是否为首版默认维度 |
@@ -137,6 +153,7 @@
 | `scorecard_id` | string | 评分卡标识 |
 | `run_id` | string | 所属 trial |
 | `dimension_scores` | list[object] | 各维度分数与理由 |
+| `grader_outputs` | list[object] | 各评分器原始输出 |
 | `total_score` | number | 汇总分 |
 | `final_verdict` | enum | `pass`、`pass_with_warning`、`fail`、`not_scorable` |
 | `grader_versions` | map | 使用到的评分器版本 |
@@ -190,6 +207,8 @@
 | `profile_id` | string | 配置主键 |
 | `base_profile` | string? | 继承自哪个默认配置 |
 | `evidence_rules` | list[object] | 证据采集项定义 |
+| `grader_order` | list[string] | 评分器执行顺序 |
+| `grader_overrides` | list[object] | 对默认评分器的启停与参数覆盖 |
 | `score_dimensions` | list[`ScoreDimension`] | 当前生效的评分维度 |
 | `result_views` | list[string] | 需要产出的视图 |
 | `profile_type` | enum | `default`、`extension` |
