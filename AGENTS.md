@@ -1,11 +1,23 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/001-revenue-rollup-cli/plan.md
+at specs/002-workbuddy-eval-harness/plan.md
 <!-- SPECKIT END -->
 
 ## 沙盒白名单命令审批申请
-在开发过程中如果某操作需要频繁做提权申请且申请的操作没有安全风险，为了以后不再需要麻烦总申请，可以将审批写入 `sandbox-rules-allow-list.md` ，一经审批以后都不会再面临提权需要。
+查阅 `sandbox-rules-allow-list.md`，把它当作和 `environment.md` 同级的必查文件，而不是"有空再看"的说明页。
+
+### 什么时候必须处理
+- 预判某条命令需要提权，且该操作低风险、可复用、后续大概率反复出现时；
+- 某条命令已经因为沙盒或权限问题申请过一次，本线程又准备再次申请相同或高度相似命令时。
+
+### 操作步骤
+1. 先在 `sandbox-rules-allow-list.md` 查找是否已有可复用的相同命令前缀，或更长的公共命令前缀。
+2. 如果已有且“已审批通过”为“是”，优先按该前缀组织命令，并在提权时复用对应 `prefix_rule`。
+3. 如果没有合适记录，不要直接跳过；先把申请补写进 `sandbox-rules-allow-list.md` 的表格，再发起本次提权。
+4. `sandbox-rules-allow-list.md` 只是申请与审计台账，真正生效入口仍是 `.codex/rules/*.rules`；未经审核，不得自行把命令加入规则文件。
+5. 一次性、明显高风险、带破坏性或边界不清晰的命令，不进入白名单申请流程，继续按单次提权处理。
+6. 当一次任务里既新增了环境记忆，又暴露出高频低风险提权场景时，同时更新 `environment.md` 和 `sandbox-rules-allow-list.md`，不要只更新前者。
 
 
 ## 环境记忆
@@ -38,3 +50,7 @@ at specs/001-revenue-rollup-cli/plan.md
 
 ## git提交要求
 - 使用中文
+
+## Build for Agents
+项目中构建的skill、eval harness等均视Agent为主要用户（记得你自己就是Agent）
+**但是**撰写SKILL.md，SPEC.md等文档时，仍然要保持第三方、客观、中性的视角
