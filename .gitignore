@@ -1,9 +1,6 @@
 .agents/skills
 .specify/
 2026**-source-excel/
-prompt.md
-speckit-ralph.md
-tool_design.md
 .venv/
 __pycache__/
 .pytest_cache/
@@ -22,12 +19,6 @@ dist/
 Thumbs.db
 .DS_Store
 .tmp/
-goal.md
-sandbox-rules-allow-list.md
-goals/
-environment.md
-.codex/
 _tmp_source_resolver/
-rollup_regression_notes.md
 tests/_**/
 **prompt**.md

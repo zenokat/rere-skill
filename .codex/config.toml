@@ -1,0 +1,13 @@
+﻿# Project-local Codex config.
+#
+# This repository runs eval cases inside CodeBuddy's Docker/OCI sandbox. The
+# outer Codex session should therefore be started with workspace-write access
+# and D:\tmp as an added writable directory, rather than with the Windows
+# `unelevated` restricted-token sandbox. The latter blocks Docker Desktop's
+# named pipe and can also block D:\tmp writes even when NTFS ACLs allow them.
+#
+# Recommended launch command for this project:
+#   codex -C D:\AI\rere-agent --sandbox workspace-write --add-dir D:\tmp
+#
+# The actual case isolation remains inside the eval harness:
+#   codebuddy --sandbox container --sandbox-new --sandbox-kill ...

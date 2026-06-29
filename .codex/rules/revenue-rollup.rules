@@ -1,0 +1,35 @@
+﻿# Project-local allow-list rules for the revenue rollup workflow.
+#
+# These rules intentionally target one stable repository launcher under
+# `.codex/scripts/` so the command prefix remains matchable even when runtime
+# arguments vary by `recog_id`, `period`, or file path.
+
+LAUNCHER = ".\\.codex\\scripts\\rere.cmd"
+POWERSHELL = "powershell.exe"
+CODEBUDDY_DOCS_SCRIPT = ".\\.codex\\scripts\\fetch_codebuddy_docs.ps1"
+
+DOCKER = "docker"
+prefix_rule(
+    pattern = [LAUNCHER, "list_recog_items"],
+    decision = "allow",
+    justification = "Read the Feishu project catalog through the repository launcher without modifying remote data.",
+)
+
+prefix_rule(
+    pattern = [LAUNCHER, "run_recog_rollup", ["--validate", "--preview", "--upload"]],
+    decision = "allow",
+    justification = "Run the approved revenue rollup workflow through the repository launcher.",
+)
+
+prefix_rule(
+    pattern = [POWERSHELL, "-File", CODEBUDDY_DOCS_SCRIPT],
+    decision = "allow",
+    justification = "Read official CodeBuddy documentation pages through a fixed read-only script.",
+)
+
+prefix_rule(
+    pattern = [DOCKER, "version"],
+    decision = "allow",
+    justification = "Read the local Docker daemon version to verify the eval container sandbox runtime.",
+)
+
