@@ -1,40 +1,33 @@
-# Specification Quality Checklist: 收入确认 WorkBuddy 自动化评测底座
+# Specification Quality Checklist: WorkBuddy / CodeBuddy Eval Harness
 
-**Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-06-24
+**Purpose**: Validate specification completeness and quality before implementation alignment
+**Updated**: 2026-06-27
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 
-- [x] No implementation details (languages, frameworks, APIs)
-- [x] Focused on user value and business needs
-- [x] Written for non-technical stakeholders
-- [x] All mandatory sections completed
-- [x] Supports default settings plus extensible observations/scoring
-- [x] Interfaces work for both humans and agents
+- [x] Focused on evaluator-facing value.
+- [x] Avoids internal design details in user-facing README.
+- [x] Uses one fixed evaluation path.
+- [x] Removes baseline, profile, fake runner and report-view scope from first release.
+- [x] Keeps grader extension as the only extension point.
+- [x] Describes environment isolation as a required evaluator-facing behavior.
 
 ## Requirement Completeness
 
-- [x] No [NEEDS CLARIFICATION] markers remain
-- [x] Requirements are testable and unambiguous
-- [x] Success criteria are measurable
-- [x] Success criteria are technology-agnostic (no implementation details)
-- [x] All acceptance scenarios are defined
-- [x] Edge cases are identified
-- [x] Scope is clearly bounded
-- [x] Dependencies and assumptions identified
-
-## Feature Readiness
-
-- [x] All functional requirements have clear acceptance criteria
-- [x] User scenarios cover primary flows
-- [x] Feature meets measurable outcomes defined in Success Criteria
-- [x] No implementation details leak into specification
+- [x] Minimal suite YAML is defined.
+- [x] Case folder layout is defined.
+- [x] Per-case sandbox lifecycle is defined.
+- [x] Skill materialization layout follows observed WorkBuddy skill loading shape.
+- [x] WorkBuddy-style context restoration is defined without replacing CodeBuddy CLI's own system prompt.
+- [x] CodeBuddy CLI execution path is defined.
+- [x] `batch.json` contract is defined.
+- [x] `result.json` contract is defined.
+- [x] `session.jsonl` contract is defined.
+- [x] Case `outputs/` contract is defined.
+- [x] Success criteria require a real CodeBuddy CLI smoke test.
 
 ## Notes
 
-- 本规格已从“rollup skill 评测基线”重置为“WorkBuddy 自动化评测底座”，范围更聚焦于评测
-  运行、证据采集、评分与基线比较。
-- 本轮规格未保留任何 [NEEDS CLARIFICATION] 标记，可直接进入 `/speckit-clarify` 或
-  `/speckit-plan`。
-- 已补充“默认设置 + 可扩展观测/评分”以及“人和 Agent 共用接口”的要求。
+- Current 002 docs have been reset according to the "delete unless required to run" principle.
+- README, plan, spec, data model, contracts, quickstart, examples and tasks point to the same first-release contract.

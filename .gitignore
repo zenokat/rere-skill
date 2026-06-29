@@ -10,6 +10,9 @@ __pycache__/
 .coverage
 .env
 .env.local
+.env*
+node_modules/
+*.log
 build/
 dist/
 *.egg-info/

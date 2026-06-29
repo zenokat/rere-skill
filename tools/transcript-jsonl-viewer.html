@@ -1,0 +1,1021 @@
+<!doctype html>
+<!--
+  Session JSONL Viewer
+
+  A standalone browser tool for pasting a CodeBuddy / WorkBuddy raw session JSONL
+  (the eval harness `session.jsonl`), then rendering a readable timeline of user
+  messages, assistant messages, tool calls, and tool results.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Session JSONL Viewer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --panel-soft: #f9fafb;
+      --ink: #18212f;
+      --muted: #667085;
+      --line: #d9dee7;
+      --strong-line: #b9c2d0;
+      --user: #15616d;
+      --assistant: #5b3f92;
+      --tool: #8a4f14;
+      --result: #256047;
+      --warn: #9d3a2e;
+      --shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+      font-family: Inter, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    button,
+    textarea,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(360px, 42vw) 1fr;
+    }
+
+    .input-pane {
+      min-width: 0;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+    }
+
+    .viewer-pane {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    header {
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .toolbar.compact {
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button,
+    select,
+    input[type="search"] {
+      min-height: 34px;
+      border: 1px solid var(--strong-line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 6px 10px;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button.primary {
+      background: #213547;
+      border-color: #213547;
+      color: #ffffff;
+    }
+
+    button:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    input:focus-visible {
+      outline: 2px solid #4d84c4;
+      outline-offset: 2px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 100%;
+      min-height: 320px;
+      resize: none;
+      border: 0;
+      padding: 16px 18px;
+      color: var(--ink);
+      background: #fbfcfe;
+      font-family: "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      tab-size: 2;
+    }
+
+    .status-bar {
+      min-height: 36px;
+      padding: 8px 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      background: var(--panel);
+      font-size: 12px;
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 18px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .stat {
+      display: inline-flex;
+      gap: 6px;
+      align-items: baseline;
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+      border-radius: 6px;
+      padding: 6px 9px;
+      min-width: 78px;
+    }
+
+    .stat strong {
+      font-size: 15px;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .timeline-wrap {
+      min-height: 0;
+      overflow: auto;
+      padding: 18px;
+    }
+
+    .timeline {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: grid;
+      gap: 12px;
+    }
+
+    .empty {
+      max-width: 760px;
+      margin: 12vh auto 0;
+      padding: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      color: var(--muted);
+    }
+
+    .event {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .event-meta {
+      position: sticky;
+      top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+      padding-top: 10px;
+    }
+
+    .event-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left-width: 4px;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .event-card.user {
+      border-left-color: var(--user);
+    }
+
+    .event-card.assistant {
+      border-left-color: var(--assistant);
+    }
+
+    .event-card.tool-call {
+      border-left-color: var(--tool);
+    }
+
+    .event-card.tool-result {
+      border-left-color: var(--result);
+    }
+
+    .event-card.permission,
+    .event-card.gap,
+    .event-card.parse-error {
+      border-left-color: var(--warn);
+    }
+
+    .event-head {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-soft);
+    }
+
+    .event-title {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      min-width: 0;
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #eef2f6;
+      color: #334155;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .badge.user {
+      background: #dff1f2;
+      color: var(--user);
+    }
+
+    .badge.assistant {
+      background: #eee7f7;
+      color: var(--assistant);
+    }
+
+    .badge.tool {
+      background: #f8eadb;
+      color: var(--tool);
+    }
+
+    .badge.result {
+      background: #e2f1e9;
+      color: var(--result);
+    }
+
+    .badge.warn {
+      background: #fde8e5;
+      color: var(--warn);
+    }
+
+    .call-id {
+      color: var(--muted);
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 340px;
+    }
+
+    .event-body {
+      padding: 12px;
+    }
+
+    .content {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .mono {
+      font-family: "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    details {
+      margin-top: 10px;
+    }
+
+    summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    pre {
+      margin: 8px 0 0;
+      padding: 10px;
+      max-height: 360px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0f172a;
+      color: #e5e7eb;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .parse-errors {
+      margin-bottom: 12px;
+    }
+
+    .search {
+      min-width: min(360px, 44vw);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 960px) {
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(320px, 45vh) 1fr;
+      }
+
+      .input-pane {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .event {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+
+      .event-meta {
+        position: static;
+        text-align: left;
+        padding: 0 0 0 4px;
+      }
+
+      .search {
+        min-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="input-pane">
+      <header>
+        <h1>Transcript JSONL Viewer</h1>
+        <div class="subtitle">粘贴 JSONL 后自动渲染</div>
+      </header>
+
+      <div class="toolbar">
+        <button class="primary" id="renderButton" type="button">渲染</button>
+        <button id="clearButton" type="button">清空</button>
+        <button id="sampleButton" type="button">示例</button>
+      </div>
+
+      <textarea id="jsonlInput" spellcheck="false" placeholder="每行一个 JSON 对象"></textarea>
+      <div class="status-bar" id="statusBar">等待输入</div>
+    </section>
+
+    <section class="viewer-pane">
+      <header>
+        <h1>可见轨迹</h1>
+        <div class="subtitle" id="sourceKind">支持 transcript/trajectory JSONL 与 CodeBuddy 原始 session JSONL</div>
+      </header>
+
+      <div class="toolbar compact">
+        <div class="controls">
+          <input class="search" id="searchInput" type="search" placeholder="过滤文本、工具名、call_id">
+          <select id="typeFilter" aria-label="事件类型过滤">
+            <option value="all">全部事件</option>
+            <option value="conversation">对话</option>
+            <option value="tool">工具</option>
+            <option value="warning">阻断/缺口</option>
+          </select>
+        </div>
+        <div class="controls">
+          <button id="collapseRawButton" type="button">收起原始 JSON</button>
+        </div>
+      </div>
+
+      <div class="stats" id="stats"></div>
+      <div class="timeline-wrap">
+        <div id="timeline" class="timeline">
+          <div class="empty">粘贴 JSONL 内容后，这里会显示对话和工具轨迹。</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const input = document.getElementById("jsonlInput");
+    const timeline = document.getElementById("timeline");
+    const stats = document.getElementById("stats");
+    const statusBar = document.getElementById("statusBar");
+    const sourceKind = document.getElementById("sourceKind");
+    const searchInput = document.getElementById("searchInput");
+    const typeFilter = document.getElementById("typeFilter");
+    const renderButton = document.getElementById("renderButton");
+    const clearButton = document.getElementById("clearButton");
+    const sampleButton = document.getElementById("sampleButton");
+    const collapseRawButton = document.getElementById("collapseRawButton");
+
+    let currentEvents = [];
+    let parseProblems = [];
+    let renderTimer = 0;
+
+    const sampleJsonl = [
+      {"type":"prompt","text":"请使用 revenue-recognition skill 完成以下评测任务。"},
+      {"type":"tool_call","name":"Bash","call_id":"call_001","summary":"python run_recog_rollup.py --validate ..."},
+      {"type":"tool_result","name":"Bash","call_id":"call_001","status":"completed","summary":"status=ok, error_count=0"},
+      {"type":"assistant_message","text":"validate 通过，开始执行 preview。"},
+      {"type":"tool_call","name":"Bash","call_id":"call_002","summary":"python run_recog_rollup.py --preview ..."},
+      {"type":"tool_result","name":"Bash","call_id":"call_002","status":"completed","summary":"result_file=.tmp/outputs/preview.xlsx, row_count=297"},
+      {"type":"final_response","text":"评测任务完成。本次只执行 validate 和 preview，未执行 upload。"}
+    ].map((item) => JSON.stringify(item)).join("\n");
+
+    /**
+     * Escape text before inserting it into HTML.
+     *
+     * @param {unknown} value Raw value from JSONL.
+     * @returns {string} Safe HTML text.
+     */
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    /**
+     * Parse pasted JSONL text into raw JSON objects.
+     *
+     * @param {string} text Pasted JSONL content.
+     * @returns {{items: Array<object>, problems: Array<object>}} Parsed items and line errors.
+     */
+    function parseJsonl(text) {
+      const items = [];
+      const problems = [];
+      const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
+      lines.forEach((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          return;
+        }
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            items.push({ ...parsed, __line: index + 1 });
+          } else {
+            problems.push({ line: index + 1, message: "不是 JSON 对象", raw: line });
+          }
+        } catch (error) {
+          problems.push({ line: index + 1, message: error.message, raw: line });
+        }
+      });
+      return { items, problems };
+    }
+
+    /**
+     * Convert normalized trajectory events or raw CodeBuddy session events into
+     * one display model.
+     *
+     * @param {Array<object>} items Parsed JSONL objects.
+     * @returns {Array<object>} Normalized display events.
+     */
+    function normalizeEvents(items) {
+      return items.flatMap((item) => {
+        if (isTrajectoryEvent(item)) {
+          return [normalizeTrajectoryEvent(item)];
+        }
+        if (item.type === "message") {
+          return normalizeMessageEvent(item);
+        }
+        if (item.type === "function_call") {
+          return [normalizeToolCallEvent(item)];
+        }
+        if (item.type === "function_call_result") {
+          return [normalizeToolResultEvent(item)];
+        }
+        if (item.type === "reasoning" || item.type === "file-history-snapshot") {
+          return [];
+        }
+        return [normalizeUnknownEvent(item)];
+      });
+    }
+
+    /**
+     * Detect events already produced by the eval harness trajectory normalizer.
+     *
+     * @param {object} item Parsed event.
+     * @returns {boolean} True when the event is a trajectory event.
+     */
+    function isTrajectoryEvent(item) {
+      return [
+        "prompt",
+        "assistant_message",
+        "tool_call",
+        "tool_result",
+        "permission_event",
+        "final_response",
+        "trajectory_gap"
+      ].includes(item.type);
+    }
+
+    /**
+     * Normalize one eval harness trajectory event.
+     *
+     * @param {object} item Trajectory event.
+     * @returns {object} Display event.
+     */
+    function normalizeTrajectoryEvent(item) {
+      const kindMap = {
+        prompt: "user",
+        assistant_message: "assistant",
+        final_response: "assistant",
+        tool_call: "tool-call",
+        tool_result: "tool-result",
+        permission_event: "permission",
+        trajectory_gap: "gap"
+      };
+      return {
+        kind: kindMap[item.type] || "unknown",
+        type: item.type,
+        role: item.type === "prompt" ? "user" : "assistant",
+        title: titleForType(item.type, item.name),
+        text: item.text || item.summary || "",
+        toolName: item.name || "",
+        callId: item.call_id || item.callId || "",
+        status: item.status || "",
+        line: item.__line,
+        raw: item,
+        searchable: compactSearchText(item)
+      };
+    }
+
+    /**
+     * Normalize raw CodeBuddy message events.
+     *
+     * @param {object} item Raw message event.
+     * @returns {Array<object>} Display events.
+     */
+    function normalizeMessageEvent(item) {
+      const text = extractContentText(item.content);
+      if (!text) {
+        return [];
+      }
+      const role = item.role || "message";
+      return [{
+        kind: role === "user" ? "user" : "assistant",
+        type: role === "user" ? "prompt" : "assistant_message",
+        role,
+        title: role === "user" ? "User" : "Assistant",
+        text,
+        toolName: "",
+        callId: item.callId || item.call_id || "",
+        status: "",
+        line: item.__line,
+        raw: item,
+        searchable: compactSearchText(item)
+      }];
+    }
+
+    /**
+     * Normalize raw CodeBuddy tool call events.
+     *
+     * @param {object} item Raw function_call event.
+     * @returns {object} Display event.
+     */
+    function normalizeToolCallEvent(item) {
+      return {
+        kind: "tool-call",
+        type: "tool_call",
+        role: "tool",
+        title: `Tool Call: ${item.name || "unknown"}`,
+        text: summarizeToolCall(item),
+        toolName: item.name || "",
+        callId: item.callId || item.call_id || "",
+        status: "",
+        line: item.__line,
+        raw: item,
+        searchable: compactSearchText(item)
+      };
+    }
+
+    /**
+     * Normalize raw CodeBuddy tool result events.
+     *
+     * @param {object} item Raw function_call_result event.
+     * @returns {object} Display event.
+     */
+    function normalizeToolResultEvent(item) {
+      const text = summarizeToolResult(item);
+      const permissionDenied = /permission/i.test(text) && /(denied|not available|拒绝)/i.test(text);
+      return {
+        kind: permissionDenied ? "permission" : "tool-result",
+        type: permissionDenied ? "permission_event" : "tool_result",
+        role: "tool",
+        title: `${permissionDenied ? "Permission" : "Tool Result"}: ${item.name || "unknown"}`,
+        text,
+        toolName: item.name || "",
+        callId: item.callId || item.call_id || "",
+        status: item.status || "",
+        line: item.__line,
+        raw: item,
+        searchable: compactSearchText(item)
+      };
+    }
+
+    /**
+     * Normalize an unrecognized event without dropping evidence.
+     *
+     * @param {object} item Parsed event.
+     * @returns {object} Display event.
+     */
+    function normalizeUnknownEvent(item) {
+      return {
+        kind: "unknown",
+        type: item.type || "unknown",
+        role: "",
+        title: `Event: ${item.type || "unknown"}`,
+        text: JSON.stringify(item, null, 2),
+        toolName: "",
+        callId: item.callId || item.call_id || "",
+        status: "",
+        line: item.__line,
+        raw: item,
+        searchable: compactSearchText(item)
+      };
+    }
+
+    /**
+     * Join visible text blocks from CodeBuddy message content.
+     *
+     * @param {unknown} content Raw content field.
+     * @returns {string} Visible text.
+     */
+    function extractContentText(content) {
+      if (!Array.isArray(content)) {
+        return "";
+      }
+      return content
+        .map((part) => {
+          if (!part || typeof part !== "object") {
+            return "";
+          }
+          if (["input_text", "output_text", "text"].includes(part.type) && part.text) {
+            return String(part.text);
+          }
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+    }
+
+    /**
+     * Build a readable summary for raw tool calls.
+     *
+     * @param {object} item Raw function_call event.
+     * @returns {string} Summary text.
+     */
+    function summarizeToolCall(item) {
+      const provider = item.providerData && typeof item.providerData === "object" ? item.providerData : {};
+      return String(provider.argumentsDisplayText || item.arguments || item.name || "");
+    }
+
+    /**
+     * Build a readable summary for raw tool results.
+     *
+     * @param {object} item Raw function_call_result event.
+     * @returns {string} Summary text.
+     */
+    function summarizeToolResult(item) {
+      const output = item.output;
+      if (output && typeof output === "object") {
+        return String(output.text || output.content || JSON.stringify(output, null, 2));
+      }
+      return String(output || item.status || "");
+    }
+
+    /**
+     * Return a display title for normalized trajectory event types.
+     *
+     * @param {string} type Event type.
+     * @param {string} name Optional tool name.
+     * @returns {string} Title.
+     */
+    function titleForType(type, name) {
+      const labels = {
+        prompt: "User",
+        assistant_message: "Assistant",
+        final_response: "Final Response",
+        tool_call: `Tool Call: ${name || "unknown"}`,
+        tool_result: `Tool Result: ${name || "unknown"}`,
+        permission_event: `Permission: ${name || "tool"}`,
+        trajectory_gap: "Trajectory Gap"
+      };
+      return labels[type] || type;
+    }
+
+    /**
+     * Flatten an event into searchable text.
+     *
+     * @param {object} item Event object.
+     * @returns {string} Lowercase searchable string.
+     */
+    function compactSearchText(item) {
+      return JSON.stringify(item).toLowerCase();
+    }
+
+    /**
+     * Render the pasted JSONL into the timeline.
+     *
+     * @returns {void}
+     */
+    function render() {
+      const parsed = parseJsonl(input.value);
+      parseProblems = parsed.problems;
+      currentEvents = normalizeEvents(parsed.items);
+      sourceKind.textContent = detectSourceKind(parsed.items);
+      renderStats(parsed.items, currentEvents, parseProblems);
+      renderTimeline();
+      statusBar.textContent = buildStatus(parsed.items, currentEvents, parseProblems);
+    }
+
+    /**
+     * Render summary counters.
+     *
+     * @param {Array<object>} raw Raw parsed events.
+     * @param {Array<object>} events Normalized display events.
+     * @param {Array<object>} problems Parse errors.
+     * @returns {void}
+     */
+    function renderStats(raw, events, problems) {
+      const counts = {
+        lines: raw.length,
+        shown: events.length,
+        user: events.filter((event) => event.kind === "user").length,
+        assistant: events.filter((event) => event.kind === "assistant").length,
+        calls: events.filter((event) => event.kind === "tool-call").length,
+        results: events.filter((event) => event.kind === "tool-result").length,
+        warnings: events.filter((event) => ["permission", "gap"].includes(event.kind)).length,
+        errors: problems.length
+      };
+      stats.innerHTML = [
+        statHtml("JSON", counts.lines),
+        statHtml("展示", counts.shown),
+        statHtml("User", counts.user),
+        statHtml("Assistant", counts.assistant),
+        statHtml("调用", counts.calls),
+        statHtml("结果", counts.results),
+        statHtml("阻断", counts.warnings),
+        statHtml("解析错误", counts.errors)
+      ].join("");
+    }
+
+    /**
+     * Build one stat chip.
+     *
+     * @param {string} label Label.
+     * @param {number} value Count.
+     * @returns {string} HTML.
+     */
+    function statHtml(label, value) {
+      return `<div class="stat"><strong>${value}</strong><span>${escapeHtml(label)}</span></div>`;
+    }
+
+    /**
+     * Render timeline cards after search and type filtering.
+     *
+     * @returns {void}
+     */
+    function renderTimeline() {
+      const query = searchInput.value.trim().toLowerCase();
+      const mode = typeFilter.value;
+      const filtered = currentEvents.filter((event) => {
+        const matchesText = !query || event.searchable.includes(query);
+        const matchesType = mode === "all"
+          || (mode === "conversation" && ["user", "assistant"].includes(event.kind))
+          || (mode === "tool" && ["tool-call", "tool-result"].includes(event.kind))
+          || (mode === "warning" && ["permission", "gap"].includes(event.kind));
+        return matchesText && matchesType;
+      });
+
+      const errorCards = parseProblems.map(renderParseProblem).join("");
+      if (!input.value.trim()) {
+        timeline.innerHTML = `<div class="empty">粘贴 JSONL 内容后，这里会显示对话和工具轨迹。</div>`;
+        return;
+      }
+      if (!filtered.length && !parseProblems.length) {
+        timeline.innerHTML = `<div class="empty">没有匹配当前过滤条件的事件。</div>`;
+        return;
+      }
+      timeline.innerHTML = errorCards + filtered.map(renderEvent).join("");
+    }
+
+    /**
+     * Render one event card.
+     *
+     * @param {object} event Display event.
+     * @param {number} index Event index.
+     * @returns {string} HTML.
+     */
+    function renderEvent(event, index) {
+      const badge = badgeForKind(event.kind);
+      const status = event.status ? `<span class="badge">${escapeHtml(event.status)}</span>` : "";
+      const callId = event.callId ? `<span class="call-id">${escapeHtml(event.callId)}</span>` : "";
+      const raw = JSON.stringify(event.raw, null, 2);
+      return `
+        <article class="event" data-kind="${escapeHtml(event.kind)}">
+          <div class="event-meta">#${index + 1}<br>line ${escapeHtml(event.line || "")}</div>
+          <div class="event-card ${escapeHtml(event.kind)}">
+            <div class="event-head">
+              <div class="event-title">
+                ${badge}
+                <span>${escapeHtml(event.title)}</span>
+              </div>
+              <div class="controls">${status}${callId}</div>
+            </div>
+            <div class="event-body">
+              <div class="content">${escapeHtml(event.text || "(empty)")}</div>
+              <details>
+                <summary>原始 JSON</summary>
+                <pre class="mono">${escapeHtml(raw)}</pre>
+              </details>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    /**
+     * Render one JSON parse problem.
+     *
+     * @param {object} problem Parse error.
+     * @returns {string} HTML.
+     */
+    function renderParseProblem(problem) {
+      return `
+        <article class="event">
+          <div class="event-meta">line ${escapeHtml(problem.line)}</div>
+          <div class="event-card parse-error">
+            <div class="event-head">
+              <div class="event-title">
+                <span class="badge warn">解析错误</span>
+                <span>${escapeHtml(problem.message)}</span>
+              </div>
+            </div>
+            <div class="event-body">
+              <pre class="mono">${escapeHtml(problem.raw)}</pre>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    /**
+     * Return a badge for an event kind.
+     *
+     * @param {string} kind Display event kind.
+     * @returns {string} HTML.
+     */
+    function badgeForKind(kind) {
+      const map = {
+        user: ["user", "User"],
+        assistant: ["assistant", "Assistant"],
+        "tool-call": ["tool", "Tool Call"],
+        "tool-result": ["result", "Tool Result"],
+        permission: ["warn", "Permission"],
+        gap: ["warn", "Gap"],
+        unknown: ["", "Event"]
+      };
+      const [className, label] = map[kind] || map.unknown;
+      return `<span class="badge ${className}">${label}</span>`;
+    }
+
+    /**
+     * Describe the detected input source.
+     *
+     * @param {Array<object>} items Parsed raw events.
+     * @returns {string} Source label.
+     */
+    function detectSourceKind(items) {
+      if (!items.length) {
+        return "支持 transcript/trajectory JSONL 与 CodeBuddy 原始 session JSONL";
+      }
+      if (items.some(isTrajectoryEvent)) {
+        return "已识别为 eval harness transcript/trajectory JSONL";
+      }
+      if (items.some((item) => ["message", "function_call", "function_call_result"].includes(item.type))) {
+        return "已识别为 CodeBuddy 原始 session JSONL";
+      }
+      return "已解析 JSONL";
+    }
+
+    /**
+     * Build the bottom status text.
+     *
+     * @param {Array<object>} raw Raw parsed events.
+     * @param {Array<object>} events Normalized events.
+     * @param {Array<object>} problems Parse errors.
+     * @returns {string} Status text.
+     */
+    function buildStatus(raw, events, problems) {
+      if (!input.value.trim()) {
+        return "等待输入";
+      }
+      return `已解析 ${raw.length} 行，展示 ${events.length} 条事件，解析错误 ${problems.length} 条`;
+    }
+
+    /**
+     * Collapse all raw JSON detail panels.
+     *
+     * @returns {void}
+     */
+    function collapseRawDetails() {
+      document.querySelectorAll("details[open]").forEach((details) => {
+        details.open = false;
+      });
+    }
+
+    /**
+     * Debounce rendering while the user is pasting or typing.
+     *
+     * @returns {void}
+     */
+    function scheduleRender() {
+      window.clearTimeout(renderTimer);
+      renderTimer = window.setTimeout(render, 120);
+    }
+
+    input.addEventListener("input", scheduleRender);
+    searchInput.addEventListener("input", renderTimeline);
+    typeFilter.addEventListener("change", renderTimeline);
+    renderButton.addEventListener("click", render);
+    clearButton.addEventListener("click", () => {
+      input.value = "";
+      searchInput.value = "";
+      render();
+      input.focus();
+    });
+    sampleButton.addEventListener("click", () => {
+      input.value = sampleJsonl;
+      render();
+    });
+    collapseRawButton.addEventListener("click", collapseRawDetails);
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,225 +1,137 @@
-# Feature Specification: 收入确认 WorkBuddy 自动化评测底座
+# Feature Specification: WorkBuddy / CodeBuddy Eval Harness
 
 **Feature Branch**: `002-workbuddy-eval-harness`
+**Created**: 2026-06-25
+**Updated**: 2026-06-28
+**Status**: Implementation alignment in progress
 
-**Created**: 2026-06-24
+## User Need
 
-**Status**: Draft
+评测执行者需要安全、真实地运行 WorkBuddy / CodeBuddy eval case，并拿到足够判断结果的最小证据：
 
-**Input**: User description: "收入确认 skill 的主要运行环境是 WorkBuddy，需要搭建自动化评测 harness，支持批量发起 case、采集 trace 与会话留痕、自动化评分，并沉淀可重复运行的基线。"
+- 整批是否跑完。
+- 每条 case 是否完成。
+- Agent 最终回答是什么。
+- grader 为什么给 `1` 或 `0`。
+- Agent 可见轨迹能否复盘。
+- case 业务产物是否真的生成。
 
-## User Scenarios & Testing *(mandatory)*
+当前目标不是给 Agent 一个完整宿主机环境，而是给它一个只属于本 case 的 workspace。CodeBuddy 不应读写原始代码仓库或用户主目录；业务产物只能写入 sandbox 的 `output/`，再由 harness 复制到结果目录。
 
-### User Story 1 - 评测执行者能批量发起 WorkBuddy 评测 (Priority: P1)
+## Scope
 
-收入确认汇总阶段 skill 的评测流程需要支持将一组固定 case 批量提交到 WorkBuddy 运
-行环境中，并让每个 case 都能被非交互地发起、跟踪和收尾，从而使团队能够稳定地重
-复运行同一批任务，而不是依赖手工逐条操作。
+首版必须支持：
 
-**Why this priority**: 如果不能稳定批量发起 case，后续的证据采集、评分和基线比较都
-无法建立，整个评测链路就会停留在一次性人工验证。
+- 用 suite YAML 定义 `suite_id`、case 列表和 graders。
+- 用 case 文件夹定义 `instruction.md`、`skills/` 和 `input/`。
+- 每条 case 在公开结果包之外的一次性 sandbox workspace 中运行。
+- sandbox 内 skill 加载结构尽量还原 WorkBuddy 的 `.workbuddy/skills/<skill-name>/`。
+- 启动上下文尽量还原 WorkBuddy session 中观察到的 `system-reminder` 形态。
+- 基于 CodeBuddy CLI 无头模式运行真实模型。
+- 默认使用 Docker/OCI 容器作为强隔离执行边界；CodeBuddy 权限参数只作为辅助护栏和取证信号。
+- 自动评分，grader 只返回 `0` 或 `1`。
+- 生成 `batch.json`、`cases/<case_id>/result.json`、`cases/<case_id>/session.jsonl` 和 `cases/<case_id>/outputs/`。
 
-**Independent Test**: 准备至少 3 个代表性 case，执行一次批量运行，验证每个 case 都
-有独立的运行记录、状态结论和后续可追踪的标识。
+首版不支持：
 
-**Acceptance Scenarios**:
+- 仅依赖 CodeBuddy 权限体系作为主要隔离边界。
+- baseline 保存与比较。
+- Markdown 报告。
+- 多套 profile。
+- fake runner 作为评测执行者路径。
+- upload 或真实外部写入评测。
+- 直接在原始代码仓库 cwd 中裸跑 Agent。
+- 在 workspace 中生成 `.bin/`、`.runtime/`、`EVAL_CASE_CONTEXT.md` 等隐藏辅助运行时。
 
-1. **Given** 已准备好 case 集、输入材料和目标 skill，**When** 评测执行者启动一次批
-   量评测，**Then** 系统会为每个 case 发起独立运行，并记录运行标识、开始时间和最
-   终状态。
-2. **Given** 某个 case 因环境缺失而无法真正执行，**When** 批量评测结束，**Then**
-   该 case 会被明确标记为环境失败，而不是静默消失或混入普通能力失败。
-3. **Given** 同一组 case 需要在后续版本重跑，**When** 评测执行者再次发起批量评
-   测，**Then** 系统仍使用相同的 case 身份与预期行为定义，保证结果可比较。
+## User Stories
 
----
+### US1: 组织可搬走的 case 文件夹
 
-### User Story 2 - 维护者能采集可复盘的评测证据 (Priority: P2)
+作为评测执行者，我希望每条 case 是一个文件夹，里面包含任务说明、skill 和输入文件，这样 case 不依赖原始代码仓库路径，也更容易审查 Agent 到底能看到什么。
 
-评测结果需要在每个 case 运行后产出完整且可引用的证据，包括运行轨迹、会话留痕和
-结果摘要，从而支持维护者判断问题更可能来自自动化编排、底层工具、WorkBuddy 环境，
-还是评测底座本身。
+**Independent Test**: 给定包含 `instruction.md`、`skills/` 和 `input/` 的 case 文件夹，harness 能把 `input/` 和 `skills/` materialize 到 sandbox workspace；`instruction.md` 不作为文件复制进 workspace，而是进入首条用户消息。
 
-**Why this priority**: 没有证据留痕，批量运行只会产出一堆“成功/失败”标签，无法支
-撑排查、复盘和后续优化。
+### US2: 控制本批评分器
 
-**Independent Test**: 针对一条成功 case、一条边界止步 case 和一条失败 case，验证
-每条结果都能关联到可追溯的证据包，并且缺失证据时会被显式标记。
+作为评测执行者，我希望在 suite YAML 中声明本批评测使用哪些 grader，这样评分口径是评测集契约的一部分，而不是藏在代码默认值里。
 
-**Acceptance Scenarios**:
+**Independent Test**: 给定 `graders: [preview_file_exists]`，harness 只运行该 grader，并把结果写入 `result.json.graders[]`。
 
-1. **Given** 某个 case 已在 WorkBuddy 中运行完成，**When** 系统收集评测证据，
-   **Then** 它会保存该 case 的运行轨迹引用、会话留痕引用和最终结论摘要。
-2. **Given** 某个 case 的部分证据未能成功收集，**When** 系统输出该 case 的评测结
-   果，**Then** 会明确指出缺失的证据类型和对评分的影响，而不是假装证据完整。
-3. **Given** 维护者需要复查某条评分，**When** 打开该 case 的结果记录，**Then**
-   能直接定位对应证据，而不必重新手工搜索整批运行文件。
+### US3: 在受控 workspace 中运行真实 CodeBuddy
 
----
+作为评测执行者，我希望每条 case 在一次性 sandbox workspace 里运行，这样 Agent 不能读写代码仓库或用户主目录，也不能把产物写到不受控位置。
 
-### User Story 3 - 评测维护者能自动评分并沉淀基线 (Priority: P3)
+**Independent Test**: 运行单条 case 时，CodeBuddy 的 cwd 位于 sandbox；sandbox 只包含 `input/`、`output/` 和 `.workbuddy/skills/<skill-name>/`；不包含 `instruction.md`、`EVAL_CASE_CONTEXT.md`、`.bin/` 或 `.runtime/`；运行结束后 sandbox 被销毁。
 
-评测底座需要能够对每个 case 自动评分，并将本轮结果与既有基线进行比较，从而支持维
-护者快速判断结果是改善、退化，还是仅表现形式变化但本质行为一致。
+### US4: 尽量还原 WorkBuddy 上下文
 
-**Why this priority**: 自动评分和基线对比是评测从“能跑”走向“能驱动迭代”的关键，
-否则每次改动后仍然只能靠主观阅读原始日志判断。
+作为评测执行者，我希望评测环境尽量接近 WorkBuddy 生产环境，这样 CodeBuddy CLI 评测结果不会因为上下文差异而失真。
 
-**Independent Test**: 对同一组 case 连续运行两轮，验证系统能输出逐 case、逐评分维
-度的结果，并标记新增问题、回归问题和无变化项。
+**Independent Test**: harness 生成的首条用户消息包含 WorkBuddy 风格的 `system-reminder` 上下文、默认 identity context、product identity、project context、additional data、connector status 和用户请求；如果 `instruction.md` 中出现 `/<skill-name>`，则注入 `manually_attached_skills`；同时不覆盖 CodeBuddy CLI 自带 system prompt。
 
-**Acceptance Scenarios**:
+### US5: 读取最小结果
 
-1. **Given** 某个 case 的正确行为是完成汇总阶段的项目识别与预览链路，**When**
-   系统完成自动评分，**Then** 结果会覆盖任务理解、工具选择、参数完整性、结果解读
-   和边界遵守等维度。
-2. **Given** 某个 case 的正确行为是阻断、澄清或停止继续执行，**When** 系统对该
-   case 评分，**Then** “正确止步”会被视为通过，而不是被误记为普通失败。
-3. **Given** 已存在一份历史基线，**When** 维护者运行新一轮评测，**Then** 系统会
-   输出新旧差异，指出受影响的 case、评分维度和主要失败聚类。
+作为评测执行者，我希望只看 `batch.json`、`result.json`、`session.jsonl` 和 `outputs/`，这样可以快速判断总体结果、单 case 评分、Agent 原始行为轨迹和业务产物。
 
----
+**Independent Test**: 运行完成后，批次根目录生成 `batch.json`，每条 case 目录生成 `result.json`、`session.jsonl` 和 `outputs/`，且不生成 Markdown、归一化轨迹或重复 JSON 视图。
 
-### User Story 4 - 人与Agent调用方都能扩展评测观测与评分 (Priority: P4)
+## Functional Requirements
 
-评测底座需要在不改变主体使用方式的前提下，支持人工维护者和Agent调用方逐步扩展
-要采集的证据、增加新的观测角度、调整评分规则和结果视图，使评测体系能够随着真实
-问题持续生长，而不是在首版被固定死。
+- **FR-001**: 系统 MUST 支持从 suite YAML 读取 `suite_id`、`graders` 和 `cases`。
+- **FR-002**: `cases` MUST 是 case 文件夹名列表。
+- **FR-003**: 每条 case 文件夹 MUST 包含 `instruction.md`、`skills/` 和 `input/`。
+- **FR-004**: 系统 MUST 不要求评测者在 case 中预设期望结果、关键词或分类。
+- **FR-005**: 系统 MUST 为每条 case 创建一次性 sandbox workspace。
+- **FR-006**: sandbox MUST 不挂载原始代码仓库和用户主目录。
+- **FR-007**: sandbox MUST 只包含 `input/`、`output/` 和 `.workbuddy/skills/<skill-name>/` 这类 case workspace 内容。
+- **FR-008**: sandbox MUST 不包含 `instruction.md`、`EVAL_CASE_CONTEXT.md`、`.bin/` 或 `.runtime/`。
+- **FR-009**: 系统 MUST 按 WorkBuddy 的 skill 加载形态放置 skill；至少保证 `SKILL.md`、`references/` 和 `scripts/` 在 `.workbuddy/skills/<skill-name>/` 下可读。
+- **FR-010**: 系统 MUST 生成 WorkBuddy 风格启动上下文，并把 `instruction.md` 原文作为 `<user_query>`。
+- **FR-011**: 系统 MUST 不把 WorkBuddy 上下文注入为第二套 system prompt；CodeBuddy CLI 自带 system prompt 不应被覆盖。
+- **FR-012**: 系统 MUST 在启动上下文中注入默认 identity context、product identity、project context、additional data 和全部 disconnected 的 connector status。
+- **FR-013**: 系统 MUST 根据 `instruction.md` 中的 `/<skill-name>` 斜杠指令决定是否注入 `manually_attached_skills`。
+- **FR-014**: 系统 MUST 使用 CodeBuddy CLI 无头模式运行真实评测。
+- **FR-015**: 系统 MUST 默认通过 Docker/OCI 容器运行每条 case；容器是主要安全边界。
+- **FR-016**: 系统 MUST 只把当前 case sandbox 挂载进容器，且不得挂载原始代码仓库或用户主目录；如果 Docker 或容器运行能力不可用，case MUST 记为环境失败。
+- **FR-017**: 系统 MUST 回收模型最终回答；当 stdout 为空但 session JSONL 有 assistant 响应时，必须使用 session 响应补齐。
+- **FR-018**: 系统 MUST 为每条成功捕获到 session 的 case 生成 `session.jsonl`，内容是 CodeBuddy / WorkBuddy 写出的原始 session JSONL 的原样副本。
+- **FR-019**: 系统 MUST 为每条 case 生成 `result.json`。
+- **FR-020**: 系统 MUST 为每条 case 保留 `outputs/`，并从 sandbox 的 `output/` 复制产物。
+- **FR-021**: 系统 MUST 为每个批次生成 `batch.json`。
+- **FR-022**: `batch.json` MUST 只包含总 case 数、完成数、通过数、失败数、批次状态和批次指标，不包含 case 数组。
+- **FR-023**: `result.json` MUST 包含运行状态、最终回答、二元分数、grader 输出、耗时、token、成本、session 路径、outputs 路径和证据缺口。
+- **FR-024**: token 和成本无法获取时，系统 MUST 写入 `null`，不得删除字段。
+- **FR-025**: 系统 MUST 支持 suite YAML 中声明的 `preview_file_exists` grader，检查本 case 的 `outputs/` 中是否存在 preview 文件。
+- **FR-026**: 系统 MUST 允许新增代码 grader 或模型 grader；grader 输出必须是 `score: 1` 或 `score: 0`，并写回 `result.json.graders[]`。
+- **FR-027**: 系统 MUST 按固定规则生成 `verdict`：所有 grader 都为 `1` 时为 `pass`，任一 grader 为 `0` 时为 `fail`。
+- **FR-028**: `session.jsonl` MUST 保留 CodeBuddy 原始事件与字段，包括 `message`、`function_call`、`function_call_result`、`reasoning`、`providerData`、`sessionId`、时间戳、工具参数和工具输出；不得归一化、重命名、屏蔽路径或丢弃字段。
+- **FR-029**: 如果无法取得 CodeBuddy 原始 session JSONL，系统 MUST 不生成假的轨迹文件，并在 `result.json.evidence.missing` 记录 `codebuddy_session_jsonl`。
+- **FR-030**: 系统 MUST 不生成 `summary.md`、`evidence.md`、`diff.md`、`agent-result.json`、`artifact-index.json`、`baseline.json`、`compare/diff.json`、`stdout.txt`、`stderr.txt`、`final.json`、`scorecard.json`。
+- **FR-031**: 系统 MUST 把真实 upload 和外部写入排除在首版普通评测之外。
+- **FR-032**: skill 随包脚本 MUST 位于 skill 自己的 `scripts/` 目录，并通过 skill 文档说明运行前提；harness 不得用 `.bin/` 或 `.runtime/` 临时补齐原始仓库运行时。
+- **FR-033**: Windows 上 CodeBuddy 原始 session 路径可能超过 260 字符；系统 MUST 支持读取这类长路径，同时在结果包中只暴露普通相对路径 `session.jsonl`。
+- **FR-034**: `session.jsonl` 是原始敏感证据，可能包含环境变量、凭据片段、绝对路径、provider 细节和 `reasoning`；文档和结果契约 MUST 明确其不适合公开分享。
 
-**Why this priority**: 评测证据与评分维度不可能在首版一次定义完整。如果缺少扩展机
-制，后续每发现一个新问题都要重做 harness，反而会让评测闭环越来越重。
+## Key Entities
 
-**Independent Test**: 基于一套默认评测设置，新增一项证据采集规则或评分维度，验证
-无需推翻原有 case 结构和运行入口，就能让新观测进入结果输出。
+- **EvalSuite**: 一个 suite YAML 和一组 case 文件夹。
+- **EvalCaseFolder**: 单条 case 的源材料目录，包含 `instruction.md`、`skills/` 和 `input/`。
+- **CaseSandbox**: 单条 case 的一次性 sandbox workspace。
+- **WorkBuddyStartupContext**: 作为首条用户消息注入的 `system-reminder` 和 `<user_query>`。
+- **BatchResult**: 整批评测结果，对应 `batch.json`。
+- **CaseResult**: 单 case 结果，对应 `result.json`。
+- **SessionRecord**: CodeBuddy / WorkBuddy 原始 session JSONL 的逐行事件，对应 `session.jsonl` 的一行。
+- **CaseOutputs**: 单 case 从 sandbox `output/` 复制出来的业务产物目录。
+- **GraderResult**: 评分器输出，写入 `result.json.graders[]`。
 
-**Acceptance Scenarios**:
+## Success Criteria
 
-1. **Given** 系统已有一套默认的证据采集与评分设置，**When** 维护者新增一种证据类
-   型或新的观测字段，**Then** harness 能在不重做主体流程的前提下纳入该扩展。
-2. **Given** 后续由Agent自主发起评测并读取结果，**When** 该流程调用 harness，
-   **Then** 输入、输出和结果定位方式仍保持结构化、稳定且适合Agent消费。
-3. **Given** 人工维护者需要快速理解本轮结果，**When** 打开同一批评测产物，
-   **Then** 也能通过面向人的摘要和证据引用完成复盘，而不需要机器专用解析工具。
-
----
-
-### Edge Cases
-
-- 同一批次中，部分 case 已完成运行，但对应的运行轨迹或会话留痕稍后才可读取时，系
-  统如何避免把“证据暂未到齐”误判为能力失败？
-- 一次评测运行的最终文字表达与上次不同，但关键动作、停止边界和结论一致时，评分如何保持
-  可比而不是被文案波动干扰？
-- 某个 case 的正确结果本来就是“不要继续往下游收入确认走”，系统如何把这种止步行
-  为识别为成功？
-- WorkBuddy 中只安装了 skill 包装层，但缺少底层汇总工具时，系统如何稳定归因为环境
-  问题，而不是错误地宣告 skill 能力退化？
-- 同一组 case 在不同版本重跑时，如果 skill 提示词、工具契约或环境准备方式发生变
-  化，系统如何同时保持 case 身份稳定并保留版本差异信息？
-- 若未来加入上传相关 case，系统如何确保未显式声明安全环境的 case 不会触发写入风
-  险？
-- 首版默认评分和证据采集设置不覆盖某类新问题时，系统如何在不破坏历史 case 可比性
-  的前提下增加新的观测字段、证据类型或评分维度？
-- 当 harness 同时被人工和自动化调用方使用时，结果输出如何既保持结构化稳定，又不牺牲人
-  工复盘所需的可读性？
-
-## Requirements *(mandatory)*
-
-### Functional Requirements
-
-- **FR-001**: 系统 MUST 能支持收入确认汇总阶段 skill 在
-  WorkBuddy 中的自动化评测，同时尽可能构建面向收入确认 SOP 的全链路Skill的评测底座。
-- **FR-002**: 系统 MUST 支持定义可重复运行的评测 case 集，每个 case 至少包含稳定
-  标识、任务说明、输入材料、预期行为类型和评分关注点。
-- **FR-003**: 系统 MUST 支持对 case 集执行非交互式运行发起，使评测执行者能够一次
-  性启动多条 case，而不是逐条手工操作。
-- **FR-004**: 系统 MUST 为每个 case 记录运行元数据，至少包括运行标识、所属批次、
-  发起时间、目标版本和最终状态。
-- **FR-005**: 系统 MUST 在每个 case 运行后收集可复盘证据，至少覆盖运行轨迹、会话
-  留痕和最终结果摘要。
-- **FR-006**: 当证据收集不完整时，系统 MUST 显式标记缺失的证据类型，并说明该缺失
-  是否影响自动评分。
-- **FR-006A**: 系统 MUST 提供一套首版默认的*最小化的*证据采集设置与评分设置，作为初始可用
-  基线，而不是要求使用者在第一次运行前手工定义全部观测项。
-- **FR-006B**: 系统 MUST 允许后续逐步扩展/删除证据采集项、观测字段、评分维度和结果视
-  图，使团队可以随着评测实践发现的新问题持续补充/调整需求。
-- **FR-006C**: 新增证据采集或评分扩展时，系统 MUST 尽量不破坏既有 case 身份、既有
-  运行入口和已有基线结果的可比性；若不可完全兼容，必须保留版本差异说明。
-- **FR-007**: 系统 MUST 为每个 case 自动产出结构化评分结果，首版暂时覆盖任务理解、工
-  具选择、参数完整性、结果解读、失败处理和边界遵守六类维度。
-- **FR-008**: 系统 MUST 支持“正确止步”类型 case，并将阻断、澄清或拒绝越界执行
-  视为可通过结果，而不是统一视为失败。
-- **FR-009**: 系统 MUST 区分至少以下失败来源：Agent行为问题（最终是skill的问题）、底层汇总工具（skill捆绑的scripts）问题、
-  WorkBuddy 或运行环境问题、评测底座自身问题。
-- **FR-010**: 系统 MUST 为每个 case 输出结构化结果记录，至少包含 case 标识、运行
-  结论、评分结果、失败归因和证据引用。
-- **FR-011**: 系统 MUST 在批量评测结束后生成一份聚合摘要，概括本轮覆盖范围、通过
-  情况、主要失败类型和优先改进方向。
-- **FR-012**: 系统 MUST 支持将本轮结果保存为可复用基线，并允许后续运行与指定基线
-  做逐 case、逐评分维度的比较。
-- **FR-013**: 系统 MUST 在重复运行同一组 case 时保持 case 身份稳定，同时单独记录
-  skill 版本、提示版本和环境版本等变化信息。
-- **FR-014**: 当 WorkBuddy 中缺少底层汇总工具、必要凭证或关键输入材料时，系统
-  MUST 将结果归类为环境失败，而不是记为 skill 能力回归。
-- **FR-015**: 系统 MUST 让维护者能够从结果记录中直接跳转到原始证据，而不需要额外
-  手工搜索整批运行产物。
-- **FR-016**: 系统 MUST 允许失败 case 也形成有效基线，前提是该失败可分类、可评分
-  或可明确标记为证据不足。
-- **FR-017**: 系统 MUST 支持输出回归视图，明确标识新增失败、修复成功、评分下降和
-  无实质变化的 case。
-- **FR-018**: 系统 MUST 让产品和研发能够通过一次评测输出回答三个问题：当前
-  WorkBuddy 评测覆盖了什么、主要问题集中在哪、下一轮优先改 skill、工具、环境还是
-  评测底座本身。
-- **FR-019**: 系统 MUST 将 harness 的主要输入、运行控制和结果输出设计为同时适合人
-  与Agent调用方使用：既要有稳定、结构化、适合Agent认知的接口，也要有便于人工快速理解的
-  摘要与证据入口。
-- **FR-020**: 当后续搭建起Agent自主迭代 skill、自主发起评测并读取结果的闭环
-  时，系统 MUST 不要求额外绕过人工专用流程，Agent应可直接复用同一套 harness 接口。
-- **FR-021**: 系统 MUST 区分“底座默认设置”和“后续扩展设置”，使维护者能够清楚判
-  断某项观测或评分来自初始基线，还是来自后续增量扩展。
-
-### Key Entities *(include if feature involves data)*
-
-- **评测 Case**: 一条可重复执行的任务样本，包含稳定身份、任务说明、输入材料、预期
-  行为和评分关注点。
-- **评测批次**: 一次批量运行的集合，用于归拢同轮触发的多个 case，并承载版本和时间
-  信息。
-- **运行记录**: 某个 case 在某一轮中的实际执行结果，包含运行标识、状态、结论和失
-  败归因。
-- **证据包**: 与单个 case 运行关联的留痕集合，包括运行轨迹、会话留痕、结果摘要和
-  原始证据引用。
-- **评分卡**: 针对单个 case 的维度化评分结果，说明各维度得分、扣分原因和最终结论。
-- **基线快照**: 某一组 case 在某个版本上的正式对比基准，用于后续重跑比较。
-- **默认评测设置**: harness 首版自带的证据采集项、评分维度和结果输出规则，用作开
-  箱即用的初始基线。
-- **扩展评测设置**: 在默认设置之外新增的观测项、证据规则、评分维度或结果视图，用
-  于响应后续评测实践中发现的新问题。
-
-## Success Criteria *(mandatory)*
-
-### Measurable Outcomes
-
-- **SC-001**: 团队能够在同一批次中完成至少 3 个代表性 case 的 WorkBuddy 自动化运
-  行，并为每个 case 产出独立结果记录。
-- **SC-002**: 100% 的已执行 case 都能得到以下三种结果之一：自动评分完成、明确的证
-  据收集失败、明确的环境失败；不允许只留下“未说明的未完成”状态。
-- **SC-003**: 对于被设计为“应阻断 / 应澄清”的 case，100% 的结果都会被单独归入
-  边界遵守视图，而不是与普通执行失败混在一起。
-- **SC-004**: 维护者能够用同一组 case 在后续版本重跑，并在单次对比输出中直接看到
-  逐 case、逐评分维度的新旧变化。
-- **SC-005**: 每轮批量评测输出都能列出主要失败聚类及对应 case 数量，使产品和研发
-  在一次评审中明确下一轮优先改进方向。
-- **SC-006**: 团队能够在不重做 harness 主流程的前提下新增至少 1 项证据采集或评分扩
-  展，并让该扩展进入下一轮评测结果。
-- **SC-007**: 同一套 harness 输出既能被人工维护者直接复盘，也能被Agent
-  稳定读取，不需要维护两套完全不同的运行入口或结果格式。
-
-## Assumptions
-
-- WorkBuddy 运行环境能够持续提供可读取的运行轨迹和会话留痕，足以支撑评测复盘。
-- 首版评测使用由团队事先准备好的固定 case 和输入材料，本 feature 不负责生成业务样
-  本本身。
-- 自动评分的首版目标是形成稳定、可复核的比较基线，而不是完全取代所有人工复核。
-- 首版先采用一套默认的最小化的证据采集与评分设置，但团队预期后续会随着真实评测问题持
-  续扩展观测项、评分维度和结果视图。
-- harness 的长期使用者既包括人工维护者，也可能包括后续自发起评测、自主读取结果的
-  Agent，因此接口设计需要同时兼顾人和Agent。
+- **SC-001**: 评测者能按 README 的 suite + case 文件夹结构跑起真实 CodeBuddy 单 case。
+- **SC-002**: 每条 case 在一次性 sandbox workspace 中运行，运行结束后 sandbox 被销毁。
+- **SC-003**: Agent 不能直接读写原始代码仓库或用户主目录。
+- **SC-004**: sandbox 内 skill 能按 WorkBuddy 风格路径被发现或被明确路径加载。
+- **SC-005**: `batch.json` 能回答总数、完成数、通过数、失败数和整体状态。
+- **SC-006**: `result.json` 能回答模型最终回答、0/1 grader 结果、耗时、token、成本和证据缺口。
+- **SC-007**: `session.jsonl` 能复盘 Agent 原始行为轨迹，并保留 CodeBuddy 原始字段。
+- **SC-008**: `outputs/` 保存 case 业务产物。
+- **SC-009**: 真实 CodeBuddy CLI 堂食收入 case 冒烟测试在满足 Docker、CodeBuddy 登录态和 skill 运行前提后通过。

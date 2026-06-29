@@ -1,252 +1,433 @@
-# 收入确认 WorkBuddy 自动化评测底座
+﻿# WorkBuddy / CodeBuddy Eval Harness 使用说明
+
+## 一句话结论
+
+这套 harness 只做一件事：把每条评测 case 放进一次性隔离环境里，用 CodeBuddy CLI 尽量还原 WorkBuddy 的可见上下文真实执行，然后产出一套最小、清楚、可复盘的结果包。
+
+评测者主要看四类东西：
+
+- `batch.json`：整批评测有没有跑完、总共有多少 case、完成了多少、通过多少、失败多少、耗时多少。
+- `cases/<case_id>/result.json`：单条 case 的运行状态、模型最终回答、grader 判断、耗时和 token 指标。
+- `cases/<case_id>/session.jsonl`：CodeBuddy / WorkBuddy 原始 session JSONL，作为 Agent 轨迹的唯一事实源，逐行原文保留，不做归一化或路径屏蔽。
+- `cases/<case_id>/outputs/`：这条 case 在隔离环境里产出的业务文件，例如 preview Excel。
 
-## 这是什么
+首版不做 baseline 保存与比较，不生成 Markdown 报告，不生成重复 JSON 视图，不提供多套 profile。评测者只有一条固定路径：组织 case 文件夹，运行评测命令，读取结果文件。
 
-这是一套给“评测执行者”使用的评测底座。
+## 基本概念
 
-它的目标不是只跑通一次收入确认 skill，而是让团队可以稳定地：
+一次评测由一个 suite 文件夹组成：
 
-1. 准备一组固定 case
-2. 批量发起评测
-3. 自动收集结果和证据
-4. 自动评分
-5. 保存成 baseline
-6. 下一轮继续重跑并比较差异
+```text
+revenue-recognition-real-smoke/
+├── suite.yaml
+└── cases/
+    └── revenue-recognition-dine-in-202605/
+        ├── instruction.md
+        ├── skills/
+        │   └── revenue-recognition/
+        │       ├── SKILL.md
+        │       ├── references/
+        │       └── scripts/
+        └── input/
+            └── 收银汇总表 202605.xlsx
+```
 
-如果把它当成一个产品来看，可以把它理解成：
+每个 case 文件夹就是一份完整的评测材料：
 
-“一套面向收入确认 skill 的自动化评测流水线产品。”
+| 路径 | 含义 |
+|---|---|
+| `instruction.md` | 发给 Agent 的任务说明。这里写真实用户请求、边界和必要提示。 |
+| `skills/` | 本 case 提供给 Agent 的 skill 包。 |
+| `input/` | 本 case 允许 Agent 读取的输入文件。 |
+
+不要在 case 里引用开发仓库绝对路径，不要要求 Agent 读取仓库根目录。case 应该像一个可搬走的包，离开原始代码仓库也能被放进隔离环境运行。
 
-## 这个产品，用户是怎么使用它的
+## suite.yaml
 
-从评测执行者视角看，完整旅程可以分成 4 步，外加两类高级配置动作。
+`suite.yaml` 只描述这批评测包含哪些 case，以及用哪些 grader 判分。
 
-### 第 1 步：先定义我要评什么
+```yaml
+suite_id: revenue-recognition-real-smoke
+graders:
+  - preview_file_exists
+cases:
+  - revenue-recognition-dine-in-202605
+```
 
-这一层对应 [case-manifest.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/case-manifest.md)。
+| 字段 | 含义 |
+|---|---|
+| `suite_id` | 评测集 ID，用来区分不同评测批次。 |
+| `graders` | 本批评测要运行的评分器。所有 grader 都只返回 `0` 或 `1`。 |
+| `cases` | case 文件夹名列表。harness 会读取 `cases/<case_id>/`。 |
 
-你要先准备一份 case manifest，告诉 harness：
+case 的 skill、输入和任务说明不再写在 YAML 里，而是放在 case 文件夹里。
 
-- 这次要跑哪些 case
-- 每个 case 的任务说明是什么
-- 它的输入材料是什么
-- 它预期是“成功跑通”，还是“正确止步”，还是“环境失败”
-- 它重点看哪些评分维度
-- 它默认使用什么安全和隔离策略
+## 隔离运行
 
-可以把它理解成：
+每条 case 都会在一次性 sandbox workspace 中运行。sandbox 的目的不是整理目录，而是让 CodeBuddy 只围绕本 case 的材料工作，并把业务产物稳定收集到约定位置。运行 sandbox 不属于公开结果包，默认放在系统临时目录下的专用根目录，避免继承原始仓库的 `AGENTS.md`、历史 `.tmp` 或用户主目录上下文。
 
-“评测任务清单”。
+运行时，harness 会为每条 case 做这些事：
 
-这一步和新补充设计的关系是：
+1. 创建一次性 sandbox workspace。
+2. 把 `input/` 和 `skills/` materialize 到 workspace。
+3. 在 workspace 内创建 `output/`，作为业务产物的唯一约定写入位置。
+4. 把 `skills/<skill-name>/` 安装成接近 WorkBuddy 的加载结构：`.workbuddy/skills/<skill-name>/`。
+5. 将 WorkBuddy 风格的 `system-reminder` 上下文和 `instruction.md` 中的用户请求作为首条用户消息发给 CodeBuddy。
+6. 以 sandbox workspace 作为 CodeBuddy 的工作区运行 `codebuddy -p ...`。
+7. 收集 session、最终回答、grader 结果和 `output/` 文件。
+8. 把证据写入结果目录。
+9. 销毁 sandbox workspace。
 
-- 如果某类 case 只能在安全环境下运行，要在这里声明
-- 如果这套 case 默认只读，或者需要特定的隔离方式，也是在这里表达
+CodeBuddy 面对的 workspace 形态固定为：
 
-### 第 2 步：发起一批评测
+```text
+<sandbox>/
+├── input/
+├── output/
+└── .workbuddy/
+    └── skills/
+        └── <skill-name>/
+            ├── SKILL.md
+            ├── references/
+            └── scripts/
+```
 
-这一层对应 [run-eval-batch.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/run-eval-batch.md)。
+隔离边界固定为：
 
-你把 case manifest 交给 harness，然后发起一次 batch。
+- CodeBuddy 的工作区是当前 case 的 sandbox workspace。
+- 原始代码仓库不作为 CodeBuddy workspace 暴露。
+- 用户主目录不作为 CodeBuddy workspace 暴露。
+- CodeBuddy 不应读取或写入 sandbox workspace 之外的业务文件。
+- 业务产物只能写入 sandbox 的 `output/`，结束后复制到 `cases/<case_id>/outputs/`。
+- `instruction.md` 是 case 源材料，运行时作为用户请求进入首条消息；它不需要作为文件留在 CodeBuddy workspace 中。
+- sandbox workspace 不包含 `EVAL_CASE_CONTEXT.md`、`.bin/` 或 `.runtime/` 这类额外辅助目录。
 
-harness 会负责：
+harness 使用 Docker/OCI 容器作为默认安全边界。运行时 CodeBuddy CLI 以当前 sandbox workspace 为 cwd，并启用 `--sandbox container --sandbox-new --sandbox-kill`；容器只应看到当前 case workspace，不能挂载原始代码仓库或用户主目录。CodeBuddy 权限参数只作为辅助护栏和 session 取证信号，不再承担主要隔离职责。
 
-- 逐条 case 去调用被测 skill
-- 为每条 case 创建独立运行记录
-- 为每条 case 创建独立工作目录
-- 收集运行过程中的证据
-- 按写策略决定是否阻断 upload 或真实外部写动作
-- 形成整批的结果目录
+CodeBuddy CLI 自己的会话历史、日志和缓存写入独立的内部 `codebuddy-state/` 目录，不放进 case workspace。这样业务 sandbox 只承载 `input/`、`output/` 和 `.workbuddy/`，状态缓存清理失败也不会被误判为业务证据缺失。
 
-可以把它理解成：
+如果 CodeBuddy CLI、登录状态、Docker、容器网络或必要运行时缺失，这条 case 应该判为环境失败，并写入 `result.json`，而不是退回到非 sandbox workspace 裸跑。
 
-“批量执行入口”。
+## WorkBuddy 上下文还原
 
-### 第 3 步：查看这次跑出来了什么
+真实 WorkBuddy session 中没有单独的 `role=system` 消息。已观察到的形态是：WorkBuddy 会把生产上下文包装进第一条 `role=user` 消息里的 `<system-reminder ...>` 块，例如：
 
-这一层对应 [result-bundle.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/result-bundle.md)。
+- `user_info`：操作系统、shell、界面主题等。
+- `identity_context`：默认 WorkBuddy 身份模板。
+- `product_identity`：声明当前产品身份是 WorkBuddy。
+- `project_context`：当前工作区文件概览。
+- `additional_data`：固定评测时间和连接器状态；连接器默认全部 `disconnected`。
+- `memory_and_skills_reminder`：记忆和 skill 管理规则。
+- `manually_attached_skills`：本轮手动挂载的 skill 名称与描述。
+- `user_query`：用户原始请求。
 
-跑完后，你会拿到一整套结果包，而不是只有一个“成功/失败”。
+CodeBuddy CLI 自己可能还有内置 system prompt。harness 不尝试覆盖或复制它，也不额外伪造第二套 system prompt。首版做法是：把 WorkBuddy 生产上下文作为普通输入中的 `system-reminder` 片段提供给 CodeBuddy，让它尽量接近 WorkBuddy 的可见上下文，同时避免两个 system prompt 相互打架。
 
-主要会看到两类结果：
+`manually_attached_skills` 不作为额外 case 配置项。harness 根据 `instruction.md` 中的用户请求判断：如果请求里出现 `/<skill-name>` 形式的斜杠指令，例如 `/revenue-recognition`，就视为用户在真实 WorkBuddy 交互中手动调用了该 skill，并在 `manually_attached_skills` 中注入对应 skill 信息。没有斜杠指令时，skill 仍可作为 workspace 材料存在，但不会被声明为本轮手动挂载。
 
-- 给机器/Agent看的结构化结果
-  - `batch.json`
-  - `run.json`
-  - `scorecard.json`
+在 sandbox workspace 中，skill 的呈现方式要尽量接近 WorkBuddy：
 
-- 给人看的可读结果
-  - `summary.md`
-  - `evidence.md`
+```text
+<sandbox>/
+├── input/
+├── output/
+└── .workbuddy/
+    └── skills/
+        └── revenue-recognition/
+            ├── SKILL.md
+            ├── references/
+            └── scripts/
+```
 
-这一步你能回答：
+Agent 可以通过 Skill 工具加载 `revenue-recognition`，也可以按上下文读取 `.workbuddy/skills/revenue-recognition/SKILL.md`。如果 CodeBuddy CLI 的 Skill 工具无法识别本地 sandbox skill，harness 必须在 prompt 中明确给出 skill 路径作为降级入口。
 
-- 哪些 case 通过了
-- 哪些 case 正确止步了
-- 哪些 case 是环境失败
-- 哪些 case 证据不完整
-- 哪些 case 是因为安全策略被阻断
-- 下一轮更应该先改 skill、工具、环境还是 harness
+## Skill 脚本
 
-可以把它理解成：
+skill 附带的可运行脚本应放在 skill 自己的 `scripts/` 目录下，并在 `SKILL.md` 或 `references/` 中用相对路径说明如何调用。harness 不额外生成 `.bin/` 或 `.runtime/` 来补脚本运行能力。
 
-“评测结果包”。
+推荐约束：
 
-### 第 4 步：把这轮结果沉淀为 baseline，并用于以后比较
-
-这一层对应 [baseline-snapshot.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/baseline-snapshot.md)。
-
-你可以把一轮结果保存成 baseline。以后再跑同一组 case 时，就拿新结果和 baseline 做比较。
-
-这样你就能知道：
-
-- 哪些 case 没变化
-- 哪些修复了
-- 哪些退化了
-- 哪些由于版本、评分器配置或证据问题暂时不可比
-
-可以把它理解成：
-
-“把一次评测结果变成以后持续比较的标准答案快照”。
-
-这里和新补充设计直接相关的是：
-
-- baseline 不只保存结果，还会保存评分器版本、评测设置和环境策略
-- 所以后面比较时，不只是比“分数变了没”，也比“这次是不是还在同一套评分和隔离规则下运行”
-
-## 两类高级配置动作
-
-上面的 4 步已经覆盖主用户旅程。除此之外，现在还多了两类“高级使用方式”。
-
-### 高级动作 1：扩展评分器
-
-这块能力没有新增独立入口，而是挂在现有的评测设置体系里。
-
-站在评测执行者视角，它的使用方式是：
-
-1. 先由开发侧在 `graders/` 目录实现一个新评分器
-2. 把它注册成系统认识的评分器定义
-3. 再通过 `EvalSettingsProfile` 决定本轮要不要启用它
-
-所以对执行者来说，交互点主要还是现有两处：
-
-- `case manifest`
-  表达某条 case 重点看哪些评分维度
-- `settings profile`
-  表达本轮启用哪些评分器、执行顺序是什么
-
-也就是说：
-
-- “写评分器实现”本身更偏扩展系统能力
-- “启用哪个评分器”才是评测执行者和系统的交互
-
-这也是为什么目前没有单独拆出新的 contract：因为它还没有形成一条新的主入口，而是挂接在现有的 `manifest + settings + scorecard` 这条主链上。
-
-### 高级动作 2：配置隔离环境和写策略
-
-这块能力同样没有新增独立入口，而是挂在已有输入和运行入口上。
-
-站在评测执行者视角，主要是两类操作：
-
-- 在 `case manifest` 里声明 case 的安全属性
-- 在 batch run 时选择本轮的工作目录根、清理策略和写策略
-
-执行者实际关心的是三件事：
-
-1. 这条 case 默认是不是只读
-2. 它能不能进入真实写环境
-3. 每条 case 是否会在独立工作目录里执行
-
-所以这块新功能虽然很重要，但它改变的是：
-
-- manifest 里要补哪些声明
-- batch run 时有哪些控制参数
-- result bundle 里会多看到哪些状态
-
-它并没有改变“我先准备 case，再跑 batch，再看结果，再做 baseline”这条总体用户旅程。
-
-## 串起来的一句话用户旅程
-
-作为评测执行者，你会这样使用这套产品：
-
-1. 写一份 case manifest，定义我要评什么
-2. 选择一套评测设置，决定默认评分器和运行策略
-3. 发起一次 batch run，让 harness 批量去跑
-4. 查看 result bundle，判断这轮表现如何
-5. 把可信结果保存成 baseline
-6. 下一轮重跑，再和 baseline 自动比较
-
-如果需要更高级能力，再进一步：
-
-7. 启用或关闭扩展评分器
-8. 调整隔离环境和写策略
-
-## 输入、交互、输出，分别是什么
-
-如果只看最外层，可以这样理解：
-
-### 输入
-
-- case manifest
-- 输入材料
-- 可选 baseline
-- 可选评测设置
-
-### 交互
-
-- 通过 batch run 入口发起一次评测
-- 可按整套 case 跑，也可挑某几个 case 跑
-- 可通过 settings profile 调整评分器与运行策略
-
-### 输出
-
-- 批次级结果
-- 单 case 结果
-- 证据导航
-- 评分卡
-- baseline 快照
-- regression diff
-
-## 为什么 contracts 很重要
-
-`contracts/` 这 4 份文档，本质上就是这个产品的“外部接口说明书”。
-
-它们决定的不是实现细节，而是：
-
-- 用户如何和产品交互
-- Agent 如何稳定调用它
-- 结果以后如何沉淀为长期资产
-
-所以你可以把 `contracts/` 理解成：
-
-“这套评测底座作为一个产品，对外长什么样。”
-
-## 为什么没有新增 contract 文档
-
-因为这两块新能力目前都还是挂在已有 contract 上的扩展维度：
-
-- 自定义评分器
-  主要扩展的是 `case-manifest`、`result-bundle` 和 baseline compare 的含义
-- 隔离与安全策略
-  主要扩展的是 `case-manifest`、`run-eval-batch` 和 `result-bundle`
-
-换句话说：
-
-- 如果新增的是一条全新的对外交互入口，通常值得新增 contract
-- 如果只是让现有输入/输出契约更丰富，一般优先补进已有 contract
-
-## 建议怎么读
-
-如果你是产品视角，推荐按下面顺序看：
-
-1. 先看本 README，建立整体用户旅程感
-2. 再看 [case-manifest.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/case-manifest.md)，理解输入
-3. 再看 [run-eval-batch.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/run-eval-batch.md)，理解交互入口
-4. 再看 [result-bundle.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/result-bundle.md)，理解输出
-5. 最后看 [baseline-snapshot.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/baseline-snapshot.md)，理解长期价值
-
-如果你特别关心这次新增的两块能力，推荐补充这样读：
-
-1. 先看 [plan.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/plan.md) 里的 `Grader Design` 和 `Isolation And Safety Design`
-2. 再回到 [case-manifest.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/case-manifest.md) 看这些能力如何落到输入层
-3. 再看 [run-eval-batch.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/run-eval-batch.md) 和 [result-bundle.md](/D:/AI/rere-agent/specs/002-workbuddy-eval-harness/contracts/result-bundle.md) 看它们如何落到运行和输出层
+- 脚本路径相对 skill 根目录，例如 `scripts/run_recog_rollup.py`。
+- 脚本应提供 `--help`，让 Agent 能自己理解参数。
+- 脚本应非交互运行，不依赖 TTY 确认、密码输入或弹窗。
+- 脚本应把输入参数、环境变量和输出位置说清楚。
+- 脚本应优先输出结构化结果，例如 JSON。
+- 脚本如果依赖第三方包，应在 skill 包内、脚本内联元数据或清晰的运行前提中声明，而不是隐式依赖原始开发仓库。
+
+如果某个 skill 的 `scripts/` 离开原始仓库后无法运行，这条 case 应判为 skill 打包或环境失败，而不是由 harness 在 workspace 中临时补一套隐藏运行时。
+
+## 本机运行前的 Codex / Docker policy
+
+本 harness 的主隔离边界是 CodeBuddy 的 Docker/OCI 容器。外层 Codex 会话不应再使用 Windows `unelevated` restricted-token sandbox，否则可能出现两个表面像权限问题、实质是外层沙盒拦截的问题：
+
+- 非提权 `docker version` 无法访问 `npipe:////./pipe/dockerDesktopLinuxEngine`，即使用户已经在 `docker-users` 组里。
+- `D:\tmp` 已经给了 Users / Authenticated Users 写权限，但 Codex 非提权命令仍无法创建评测 sandbox 目录。
+
+不要再通过修改用户级 `C:\Users\<user>\.codex\config.toml` 里的 `[windows] sandbox = "unelevated"` 来修复本仓库评测问题。当前 Windows / Codex Desktop 环境已经多次验证：改这个全局配置后，Codex 重启可能直接无法启动，必须改回才能进入会话。
+
+推荐按任务使用一次性启动参数。常规调试优先用下面的方式启动本仓库会话：
+
+```powershell
+codex -C D:\AI\rere-agent --sandbox workspace-write --add-dir D:\tmp
+```
+
+如果当前 Codex / Windows 会话仍然拦截 `D:\tmp` 写入或 Docker named pipe，可以在受控本机调试场景直接用：
+
+```powershell
+codex -C D:\AI\rere-agent --sandbox danger-full-access
+```
+
+这只是在外层 Codex 会话放开本机文件沙盒，真实 eval case 的隔离仍由 CodeBuddy 的 Docker/OCI 容器负责。不要把修改全局 `windows.sandbox` 当成常规修复手段。Docker Desktop 的 `tcp://localhost:2375 without TLS` 只适合短时诊断，常规运行应关闭。
+
+## 发起评测
+
+使用仓库启动器运行：
+
+```powershell
+.\.codex\scripts\rere.cmd run_skill_eval_batch `
+  --suite specs/002-workbuddy-eval-harness/examples/revenue-recognition-real-smoke/suite.yaml `
+  --output_root .tmp/evals/revenue-real-smoke
+```
+
+命令执行后，stdout 只需要返回：
+
+```json
+{
+  "batch_id": "20260627-130214-revenue-recognition-real-smoke",
+  "status": "passed",
+  "case_counts": {
+    "total": 1,
+    "completed": 1,
+    "passed": 1,
+    "failed": 0
+  },
+  "batch_json": ".tmp/evals/revenue-real-smoke/20260627-130214-revenue-recognition-real-smoke/batch.json"
+}
+```
+
+## 结果文件
+
+一次运行只需要看下面这些文件：
+
+```text
+<output_root>/<batch_id>/
+├── batch.json
+└── cases/
+    └── <case_id>/
+        ├── result.json
+        ├── session.jsonl
+        └── outputs/
+            └── <case产物文件>
+```
+
+不会生成：
+
+- `summary.md`
+- `evidence.md`
+- `diff.md`
+- `agent-result.json`
+- `artifact-index.json`
+- `baseline.json`
+- `compare/diff.json`
+- `stdout.txt`
+- `stderr.txt`
+- `final.json`
+- `scorecard.json`
+
+## batch.json 怎么看
+
+`batch.json` 是整批评测入口。
+
+```json
+{
+  "batch_id": "20260627-130214-revenue-recognition-real-smoke",
+  "suite_id": "revenue-recognition-real-smoke",
+  "status": "passed",
+  "case_counts": {
+    "total": 1,
+    "completed": 1,
+    "passed": 1,
+    "failed": 0
+  },
+  "metrics": {
+    "duration_ms": 48231,
+    "tokens": {
+      "input": null,
+      "output": null,
+      "total": null
+    },
+    "cost": {
+      "amount": null,
+      "currency": null
+    }
+  }
+}
+```
+
+重点看：
+
+| 字段 | 判断方式 |
+|---|---|
+| `status` | 整批是否通过。 |
+| `case_counts.total` | 本轮总 case 数。 |
+| `case_counts.completed` | 完成运行、取证和评分的 case 数。 |
+| `case_counts.passed` / `case_counts.failed` | 有多少 case 被 grader 判为通过或失败。 |
+
+每条 case 的具体情况不写在 `batch.json` 里。要看某条 case，直接打开 `cases/<case_id>/result.json`。
+
+## result.json 怎么看
+
+`result.json` 是单条 case 的完整结果。
+
+```json
+{
+  "case_id": "revenue-recognition-dine-in-202605",
+  "status": "completed",
+  "verdict": "pass",
+  "score": 1,
+  "final_response": "已完成 202605 堂食收入汇总 preview，未执行 upload。",
+  "metrics": {
+    "duration_ms": 48231,
+    "tokens": {
+      "input": null,
+      "output": null,
+      "total": null
+    },
+    "cost": {
+      "amount": null,
+      "currency": null
+    }
+  },
+  "graders": [
+    {
+      "id": "preview_file_exists",
+      "type": "code",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "evidence": {
+        "file": "outputs/202605_dine_in_revenue.xlsx",
+        "size_bytes": 18642,
+        "sha256": "..."
+      }
+    }
+  ],
+  "evidence": {
+    "session_path": "session.jsonl",
+    "outputs_path": "outputs/",
+    "missing": []
+  }
+}
+```
+
+读取顺序：
+
+1. 看 `status`：这条 case 是否完成运行。
+2. 看 `verdict` 和 `score`：grader 是否判定通过。`score` 只会是 `1` 或 `0`。
+3. 看 `final_response`：模型最终回答是什么。
+4. 看 `graders[].summary`：每个 grader 为什么给 `1` 或 `0`。
+5. 看 `evidence.missing`：证据是否缺失。
+6. 看 `outputs/`：业务产物是否真的存在。
+
+## session.jsonl 怎么看
+
+`session.jsonl` 是 CodeBuddy / WorkBuddy 原始 session 的逐行原文，每一行是一个原始事件 JSON。它是 Agent 轨迹的**唯一事实源**：harness 直接把 CodeBuddy 写出的 session 文件原样复制过来，不做归一化、不重命名事件、不屏蔽路径、不丢弃字段。
+
+原始事件类型由 CodeBuddy 决定，常见的有：
+
+| 事件类型 | 含义 |
+|---|---|
+| `message` + `role=user` | 用户消息（含 system-reminder 上下文与 user_query） |
+| `message` + `role=assistant` | Agent 回复（含完整 output_text） |
+| `function_call` | 工具调用（含完整 arguments） |
+| `function_call_result` | 工具返回（含完整 stdout/stderr/exit code） |
+| `reasoning` | 底层思维链（按 CodeBuddy 原样保留） |
+
+事件里还包含 `providerData`（模型、token 用量）、`sessionId`、时间戳等原始字段，全部保留。评测者可以直接在原始事件里看到 Agent 实际读了哪个文件、跑了什么命令、工具返回了什么——包括完整路径，不会有 `<host-path>` 之类的屏蔽。
+
+注意：`session.jsonl` 是原始敏感证据包，可能包含工具输出里的环境变量、凭据片段、绝对路径、provider 细节和 `reasoning`。它适合本地复盘和受控归档，不适合公开分享；如果真实凭据被采进 session，应先轮换凭据，再分发结果包。
+
+Windows 上 CodeBuddy state 里的真实 session 路径可能超过 260 字符。harness 采集时必须支持 Windows 扩展长路径读取 `codebuddy-state/<case>/projects/<cwd-id>/*.jsonl`；结果包里仍只暴露普通相对路径 `session.jsonl`。
+
+因为它是原始 session，体量较大且包含 provider 细节。如果只需要快速复盘核心对话与工具使用，可以用 `tools/transcript-jsonl-viewer.html` 在浏览器里渲染，或自行写筛选脚本读取。
+
+如果某条 case 没有捕获到 session（例如环境失败、CodeBuddy 未写出 session 文件），`session.jsonl` 不会生成，并在 `result.json` 的 `evidence.missing` 里记为 `codebuddy_session_jsonl`。
+
+## outputs/ 怎么看
+
+`outputs/` 是这条 case 在隔离环境里产生的文件集合。它不是额外报告，而是业务产物本身。
+
+规则固定：
+
+- Agent 运行时只能把业务产物写到 sandbox 的 `output/`。
+- harness 结束后把 `output/` 原样复制到结果目录的 `cases/<case_id>/outputs/`。
+- grader 如果引用产物，必须使用 `outputs/...` 相对路径。
+- `outputs/` 可以为空，但目录必须存在。
+
+## 评分器
+
+grader 只做 0/1 二元判断。`suite.yaml` 里写了哪些 grader，本批评测就跑哪些 grader。
+
+```yaml
+graders:
+  - preview_file_exists
+```
+
+每个 grader 写回 `result.json.graders[]`：
+
+```json
+{
+  "id": "preview_file_exists",
+  "type": "code",
+  "score": 1,
+  "summary": "已在 outputs/ 中找到本次 preview 文件。",
+  "evidence": {
+    "file": "outputs/202605_dine_in_revenue.xlsx"
+  }
+}
+```
+
+`verdict` 的计算规则固定：
+
+- 所有 grader 的 `score` 都是 `1`，`verdict` 就是 `pass`。
+- 只要任意一个 grader 的 `score` 是 `0`，`verdict` 就是 `fail`。
+- 如果 grader 无法读取证据，也返回 `score: 0`，并在 `summary` 里说明原因。
+
+grader 可以评很多东西：`outputs/` 文件、`result.json`、`session.jsonl`、Agent 是否调用了某个工具、是否触碰禁止动作，或者受控远端结果。扩展方式是新增 grader 代码或模型 grader，不是增加一堆 case 配置字段。
+
+## 推荐工作流
+
+建立一条新 case：
+
+1. 新建 `cases/<case_id>/`。
+2. 写 `instruction.md`。
+3. 把被测 skill 放入 `skills/<skill-name>/`。
+4. 把允许 Agent 使用的输入文件放入 `input/`。
+5. 在 `suite.yaml` 的 `cases` 中加入 `<case_id>`。
+6. 在 `suite.yaml` 的 `graders` 中选择评分器。
+7. 运行 `run_skill_eval_batch`。
+8. 看 `batch.json`。
+9. 看 `cases/<case_id>/result.json`。
+10. 看 `cases/<case_id>/session.jsonl` 和 `outputs/`。
+
+分析失败：
+
+1. 先看 `batch.json.case_counts.failed`。
+2. 打开失败 case 的 `result.json`。
+3. 用 `status` 判断是环境失败、运行失败还是评分失败。
+4. 用 `graders[]` 判断哪个评分器给了 `0`。
+5. 用 `session.jsonl` 复盘 Agent 卡在哪一步。
+6. 用 `outputs/` 确认产物是否真的生成。
+
+## 当前验收标准
+
+首版 harness 需要满足：
+
+- 每条 case 以一次性本地 sandbox 作为 CodeBuddy workspace，结束后销毁 sandbox。
+- CodeBuddy 的 case workspace 不包含原始代码仓库或用户主目录。
+- case 以文件夹组织，包含 `instruction.md`、`skills/` 和 `input/`。
+- suite YAML 包含 `suite_id`、`graders` 和 `cases`。
+- sandbox 中的 skill 加载方式尽量还原 WorkBuddy 的 `.workbuddy/skills/<skill-name>/`。
+- 启动上下文尽量还原 WorkBuddy 的 `system-reminder` 形态，但不覆盖 CodeBuddy CLI 自带 system prompt。
+- 每条 case 输出 `result.json`、`session.jsonl` 和 `outputs/`。
+- 批次根目录只输出 `batch.json`。
+- grader 可扩展，但结果仍写回 `result.json.graders[]`。

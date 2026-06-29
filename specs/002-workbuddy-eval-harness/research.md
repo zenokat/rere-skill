@@ -1,89 +1,70 @@
-# Research: 收入确认 WorkBuddy 自动化评测底座
+﻿# Research: WorkBuddy / CodeBuddy Eval Harness
 
-## Decision 1: 首版自动化入口采用 CodeBuddy CLI 无头模式，而不是 WorkBuddy GUI
+## R1: 评测输入形式
 
-- **Decision**: 首版 runner 以 CodeBuddy CLI 官方无头模式作为自动化执行面，WorkBuddy GUI 仅视为同核的人类使用壳层。
-- **Rationale**: Workbuddy官方文档明确给出了 `-p/--print`、`--resume`、`--continue`、`--output-format` 等自动化能力；这比围绕 GUI 做脆弱编排更稳定，也更适合后续 Agent 自主发起评测。
-- **Alternatives considered**:
-  - 直接自动操作 WorkBuddy GUI：更贴近终端用户界面，但自动化脆弱、状态不稳定、可复用性差。
-  - 完全脱离官方 CLI，自己伪造 skill 调用：会偏离真实运行环境，评测价值不足。
+- **Decision**: 评测集由 suite YAML + case 文件夹组成。suite YAML 只包含 `suite_id`、`graders` 和 `cases`；每条 case 的任务、skill 和输入文件放在 case 文件夹中。
+- **Rationale**: 评测者需要清楚控制 Agent 能看到什么。把 prompt、skill 路径和 input 都塞进 YAML 会让 case 难以审查，也容易泄露开发仓库路径。
+- **Implication**: 旧的 `skill.path`、`skill.name`、`cases[].prompt` 从用户契约中移除。
 
-## Decision 2: 标准结果使用 `json`，深度留痕补充 `stream-json`
+## R2: 环境隔离
 
-- **Decision**: 每个 case 的标准机器结果以 CLI `--output-format json` 为主；需要更细过程留痕时，再补充 `stream-json` transcript。
-- **Rationale**: `json` 结果更适合作为稳定主契约，方便批量汇总、评分和基线比较；`stream-json` 更适合复盘完整对话过程，但不应成为每次运行都必须依赖的主结果。
-- **Alternatives considered**:
-  - 只保留纯文本输出：人工可读，但机器解析与回归比较成本太高。
-  - 默认所有运行都全量保存 `stream-json`：证据更丰富，但首版成本更高，且会放大存储与隐私管理压力。
+- **Decision**: 每条 case 必须在一次性 sandbox workspace 中运行。默认要求 Docker/OCI 强隔离：本地仍 materialize 一次性 sandbox workspace，但 CodeBuddy 在容器内执行，容器只挂载当前 case workspace。
+- **Rationale**: 用户当前目标是稳定阻止评测 Agent 读写原始代码仓库和本机其它目录。真实冒烟已证明 CodeBuddy 权限提示、Bash/PowerShell approval 和非交互模式会影响 case 成败，因此隔离边界应前移到 Docker，由容器挂载范围决定 Agent 可见文件。
+- **Implication**: harness 不允许在隔离失败时退回宿主机裸跑；如果 Docker、容器内 CodeBuddy 登录态或必要运行时不可用，case 应记为环境失败。CodeBuddy 权限事件会保留在原始 `session.jsonl` 中，但不再承担主要安全边界。
 
-## Decision 3: 每条 trial 默认新开会话，但保留 `session_id` 以便复盘与续跑
+## R3: WorkBuddy skill 加载形态
 
-- **Decision**: 批量评测时，每条 case 默认使用独立新会话执行；同时保存 `session_id`，支持后续 `--resume` 或 `--continue` 做人工复查或补充问答。
-- **Rationale**: Anthropic 的 eval 方法强调 trial 间要避免状态泄漏；独立会话更利于保证可比性。与此同时，保存会话 ID 又能降低复盘成本。
-- **Alternatives considered**:
-  - 一整批 case 共用一个长会话：容易互相污染上下文，导致分数失真。
-  - 完全丢弃会话身份：可以减少管理复杂度，但复盘和人工追查成本过高。
+- **Decision**: case 源目录中使用 `skills/<skill-name>/`，运行时 materialize 到 sandbox 的 `.workbuddy/skills/<skill-name>/`。
+- **Observed Source**: 本地 WorkBuddy session 中，Skill 工具返回的 skill 基目录类似 `C:\ProgramData\WorkBuddy\users\<user_id>\.workbuddy\skills\revenue-recognition`，并从该目录加载 `SKILL.md`。
+- **Rationale**: 评测者维护 case 时需要简单直观的结构；运行时则应尽量接近 WorkBuddy 生产路径。
+- **Implication**: 实现时不把 skill 放在 workspace 根目录。至少要保证 `.workbuddy/skills/<skill-name>/SKILL.md` 存在。
 
-## Decision 4: 将证据拆成“最小必备层”和“可选深度层”
+## R4: WorkBuddy 启动上下文
 
-- **Decision**: 首版把证据分为两层。最小必备层包含运行元数据、stdout/stderr、最终 JSON、`session_id` 和证据完整性标记；可选深度层再包含 transcript、OTel trace、更多工具细节。
-- **Rationale**: 腾讯那篇实践强调 trace 是基础设施，但同时也提醒评测要先有闭环、再逐步完善。先锁定“每次一定能落下主结果”，再让深度留痕增量接入，风险更可控。
-- **Alternatives considered**:
-  - 一开始要求所有深度证据必须到齐：容易被环境能力或隐私顾虑卡死首版推进。
-  - 只保留最终 pass/fail：复盘信号太弱，不满足本 feature 目标。
+- **Decision**: harness 应生成 WorkBuddy 风格的 `system-reminder` 用户上下文，而不是伪造额外 `role=system`。
+- **Observed Source**: 本地 WorkBuddy session 中未观察到独立 `role=system` 消息。第一条 `role=user` 消息包含 `<system-reminder ...>` 块，其中包括 `user_info`、`identity_context`、`product_identity`、`project_context`、`additional_data`、`memory_and_skills_reminder`、`manually_attached_skills` 和 `user_query`。
+- **Rationale**: CodeBuddy CLI 可能有自己的内置 system prompt。再注入一套 system prompt 容易产生优先级和语义冲突；把 WorkBuddy 上下文作为普通输入更接近已观察 session，也更可控。
+- **Implication**: 首版注入默认 identity 模板、全部 disconnected 的 connector status、sandbox project context 和原始用户请求。不注入真实个人记忆或用户主目录内容。
 
-## Decision 5: OTel traces 作为可选证据通道，默认不开启敏感内容记录
+## R5: `manually_attached_skills` 判定
 
-- **Decision**: 采用 CodeBuddy CLI 官方 OTel trace 能力作为可选证据通道；默认只把 trace 当作附加观察面，prompt 内容、工具参数和工具全文都保持 opt-in。
-- **Rationale**: 官方监控文档说明 traces 已对齐 Claude Code 约定，但 metrics/logs 还不在当前范围。对首版而言，把 OTel 当“增强可观测性”比当“唯一主证据”更稳妥。
-- **Alternatives considered**:
-  - 不接 OTel，只保留本地文件：实现更简单，但后续无法平滑接入企业观测平台。
-  - 默认打开所有敏感内容上报：虽然方便排查，但不符合最小披露原则。
+- **Decision**: 不新增 case 配置项控制手动挂载 skill。harness 根据 `instruction.md` 中是否出现 `/<skill-name>` 判断。
+- **Rationale**: 真实 WorkBuddy 交互中，用户用斜杠指令调用 skill。把这个动作写在用户请求里，比额外配置更贴近真实交互，也减少评测执行者要维护的字段。
+- **Implication**: 例如 `instruction.md` 包含 `/revenue-recognition` 时，启动上下文注入 `manually_attached_skills`；没有斜杠指令时，skill 仍在 workspace 中，但不声明为本轮手动挂载。
 
-## Decision 6: 评分器采用 `确定性 > Rubric > 人工` 的三层结构
+## R6: `instruction.md` 的运行时位置
 
-- **Decision**: 首版评分以确定性评分器为主，Rubric 评分器为辅，人工评分器只做校准、争议复核与基线晋升。
-- **Rationale**: 这同时呼应了腾讯实践和 Anthropic 方法论。能用代码判断的，不交给模型；模型用于补足软指标；人工则用于校准和兜底。
-- **Alternatives considered**:
-  - 全部人工打分：最可靠，但无法支持高频回归。
-  - 全部交给 LLM Judge：成本更低，但稳定性和可解释性不足。
+- **Decision**: `instruction.md` 是 case 源材料，运行时作为 `<user_query>` 注入首条用户消息，不复制进 CodeBuddy workspace。
+- **Rationale**: 真实 WorkBuddy 中用户请求是消息，不是 workspace 文件。把 instruction 同时作为文件和消息会制造额外上下文，影响评测真实性。
+- **Implication**: sandbox 中不应出现 `instruction.md`。如果 Agent 需要复盘任务，应从首条消息中读取。
 
-## Decision 7: 评分看结果与关键守卫，不机械绑定完整路径
+## R7: Skill 脚本运行边界
 
-- **Decision**: 评分重点放在最终结论、边界遵守、关键动作和失败归因，不把“完整工具调用顺序必须一模一样”当作首版强约束。
-- **Rationale**: Anthropic 特别提醒不要把评测写成“路径锁死”。只要结果正确、关键守卫满足，就不该因合理路径差异而扣分。
-- **Alternatives considered**:
-  - 严格按固定工具序列评分：实现简单，但会惩罚合理变化。
-  - 完全不看过程信号：又会丢失对环境失败、越界行为和关键动作缺失的判断能力。
+- **Decision**: skill 附带脚本应放在 skill 自己的 `scripts/` 下，并由 `SKILL.md` 或 `references/` 说明运行前提。harness 不生成 `.bin/` 或 `.runtime/`。
+- **Rationale**: 根据 agent skill 的脚本使用习惯，脚本应是 skill 产品包的一部分，能通过相对路径、`--help`、非交互参数和结构化输出被 Agent 使用。由 harness 临时注入仓库 CLI wrapper 会把评测变成“依赖本仓库的特殊环境”，不再是可搬走的 case。
+- **Implication**: 如果某个 skill 的 `scripts/` 离开原始仓库后无法运行，应判为 skill 打包或环境失败，而不是由 harness 补一套隐藏运行时。
 
-## Decision 8: “正确止步”必须成为一类独立通过类型
+## R8: 结果文件最小化
 
-- **Decision**: case 预期类型中显式支持 `correct_stop`，并在评分与聚合报告中单列展示。
-- **Rationale**: 本 feature 的多个需求都强调阻断、澄清和拒绝越界执行本身可以是正确结果。如果不把它做成一等公民，评测会天然鼓励“什么都继续做”的错误行为。
-- **Alternatives considered**:
-  - 统一把未继续执行视为失败：会直接违背边界遵守需求。
-  - 只靠人工解释“这次停下也算对”：会让自动评分失去价值。
+- **Decision**: 每次运行只暴露 `batch.json`、`cases/<case_id>/result.json`、`cases/<case_id>/session.jsonl` 和 `cases/<case_id>/outputs/`。
+- **Rationale**: 评测者真正要看的是总体运行情况、单 case 指标、Agent 轨迹和业务产物。其它报告文件会增加阅读成本和口径漂移风险。
+- **Implication**: Markdown 报告、artifact index、agent-result、final、scorecard、baseline 和 diff 都不进入首版结果包。
 
-## Decision 9: 基线快照保存“可比较上下文”，而不只是保存一个总分
+## R9: Grader 契约
 
-- **Decision**: baseline 需要同时保存 case 身份、评分结果、失败归因、证据引用、skill/prompt/environment 指纹和 scorer 版本。
-- **Rationale**: 同一组 case 在不同版本重跑时，只有把“为什么这次和上次能比”一起存下来，回归结果才可信。否则一旦 prompt、skill 包或环境变了，就只剩表面分数，没有解释能力。
-- **Alternatives considered**:
-  - 只保存总分或通过率：太粗，无法定位回归位置。
-  - 每次都重新人工比对原始日志：成本太高，无法长期维护。
+- **Decision**: suite YAML 必须声明本批 graders。grader 只输出 0/1 二元判断，扩展后仍写回 `result.json.graders[]`。
+- **Rationale**: 评分口径是评测集的一部分，不能只藏在代码默认值里。二元输出让 `verdict` 简单稳定：全 1 为 pass，有 0 为 fail。
+- **Implication**: 当前堂食收入 case 使用 `preview_file_exists`，该 grader 检查 `outputs/` 中是否存在 preview 文件。
 
-## Decision 10: capability eval 通过后毕业为 regression suite
+## R10: Session 来源
 
-- **Decision**: 首版先把代表性真实 case 当 capability eval 跑通；当这些 case 稳定通过后，再晋升为固定 regression suite。
-- **Rationale**: Anthropic 的“毕业机制”和腾讯的“通过后纳入回归”是一致的。这样既能用评测驱动迭代，又能让早期投入逐步沉淀成长期资产。
-- **Alternatives considered**:
-  - 一开始就按完整回归治理：前期成本过高，不利于快速起步。
-  - 每轮都只做一次性人工验证：资产无法复利。
+- **Decision**: `session.jsonl` 不由 harness 猜测生成，也不再归一化；它是 CodeBuddy / WorkBuddy 原始 session JSONL 的原样副本。
+- **Observed Source**: CodeBuddy / WorkBuddy session 中已观察到 `message`、`function_call`、`function_call_result`、`reasoning` 和 `file-history-snapshot`。
+- **Rationale**: 当前最重要的是保留真实证据，避免归一化时丢字段、改事件名或错误屏蔽路径。原始 session 虽然更大、更敏感，但它是复盘 Agent 真实行为的唯一事实源。
+- **Implication**: 原始 `reasoning`、`providerData`、工具参数、工具输出和绝对路径都会保留。结果包必须按敏感证据管理；如果 session JSONL 缺失，不生成假轨迹，只在 `result.json.evidence.missing` 记录 `codebuddy_session_jsonl`。
 
-## Decision 11: 首版默认评测范围仅覆盖 rollup 的 validate / preview
+## R11: 外部写入边界
 
-- **Decision**: 首版默认 case 只覆盖 `list_recog_items`、`run_recog_rollup --validate`、`run_recog_rollup --preview` 以及正确止步/环境失败场景；upload 仅在 case 明确声明 `safe_environment` 时纳入。
-- **Rationale**: 现有收入确认 skill 参考文档已经明确：首版评测基线优先覆盖 validate 和 preview，upload 需要受控环境和显式授权。
-- **Alternatives considered**:
-  - 默认把 upload 也纳入主评测：风险更高，也会增加环境噪声。
-  - 只评 list / validate，不评 preview：无法覆盖真实业务核心链路。
+- **Decision**: 首版普通 case 不评测真实 upload 或其它外部写入。
+- **Rationale**: 隔离环境优先验证 Agent 能否读 skill、消费 input、生成 output 和遵守边界。外部写入需要额外凭证、审计和回滚方案。
+- **Implication**: 如果 instruction 要求 upload，harness 应阻断或判为不支持的 case，而不是放宽隔离。

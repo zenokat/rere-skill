@@ -1,128 +1,104 @@
-# Contract: 批量运行入口
+# Contract: run_skill_eval_batch
 
-## Purpose
-
-该契约定义 harness 的主入口如何被人和 Agent 调用，用于一次性发起一批 case、收集证据、
-执行评分并输出可比较结果。
-
-## Proposed Command
-
-在仓库本地开发环境中，首版建议统一通过仓库启动器暴露：
+## Command
 
 ```powershell
-.\.codex\scripts\rere.cmd run_skill_eval_batch
+.\.codex\scripts\rere.cmd run_skill_eval_batch `
+  --suite <suite.yaml> `
+  --output_root <output-dir>
 ```
 
-说明：
+## Arguments
 
-- 这是仓库级开发入口，不代表未来 skill 产品包的唯一入口。
-- 选择 `rere.cmd` 是为了复用本仓库对 Python 环境初始化的统一约束。
-
-## Required Arguments
-
-| Argument | Type | Description |
-|---|---|---|
-| `--suite` | path | case manifest 路径 |
-| `--output_root` | path | 本轮运行输出目录 |
-
-## Optional Arguments
-
-| Argument | Type | Description |
-|---|---|---|
-| `--case` | string, repeatable | 仅运行指定 case |
-| `--baseline` | path | 指定对比基线 |
-| `--settings_profile` | string | 覆盖 manifest 中默认设置 |
-| `--runner` | string | 默认 `codebuddy_headless` |
-| `--result_format` | string | `text` 或 `json`，默认 `json` |
-| `--capture_transcript` | flag | 是否保存 `stream-json` transcript |
-| `--enable_otel` | flag | 是否开启 OTel trace 导出 |
-| `--promote_baseline` | string | 运行成功后直接生成基线名称 |
-| `--workspace_root` | path | case 独立工作目录根路径 |
-| `--cleanup_workspaces` | flag | 运行结束后清理临时工作目录 |
-| `--write_policy` | string | `read_only`、`safe_only`、`approved_write` |
-
-## Runner Behavior
-
-执行器必须保证：
-
-1. 每条 case 生成独立 `run_id` 和输出目录。
-2. 无头执行默认通过 CodeBuddy CLI `-p` 发起。
-3. 若任务涉及授权动作，runner 必须只在受信场景下为底层 CLI 注入 `-y`。
-4. 即使单个 case 失败，整批运行也要尽量完成其余 case，并在批次摘要中给出完整状态。
-5. 每条 case 还必须生成独立 `workspace_dir`，不得复用其他 case 的运行目录。
-6. 当 `write_policy=read_only` 时，runner 必须阻断 upload 或真实外部写动作。
-7. 当 case 声明需要安全写环境时，runner 必须先校验环境，再决定是否放行。
-
-## Exit Codes
-
-| Code | Meaning |
+| 参数 | 含义 |
 |---|---|
-| `0` | 批次完成，且没有 unexpected regression |
-| `1` | 用法错误或 harness 内部错误 |
-| `2` | 批次完成，但存在 unexpected failure / regression |
-| `3` | 运行环境阻断到无法形成可靠评测结果 |
-| `4` | 安全策略阻断了被禁止的写操作 |
+| `--suite` | 评测集 YAML 路径。 |
+| `--output_root` | 评测结果输出根目录。 |
 
-## Stdout Contract
+首版不提供 runner/profile/baseline/OTel/raw session 参数。
 
-当 `--result_format json` 时，stdout 至少返回以下结构：
+## Per Case Flow
+
+每条 case 按以下顺序执行：
+
+1. 读取 `cases/<case_id>/instruction.md`、`skills/` 和 `input/`。
+2. 在公开结果包之外创建一次性 sandbox workspace。
+3. 复制 `input/` 到 sandbox。
+4. 创建 sandbox `output/`。
+5. 将 `skills/<skill-name>/` materialize 为 `.workbuddy/skills/<skill-name>/`。
+6. 生成 WorkBuddy 风格 `system-reminder` 启动上下文，把 `instruction.md` 原文放入 `<user_query>`。
+7. 如果 `<user_query>` 中包含 `/<skill-name>`，注入对应 `manually_attached_skills`。
+8. 以 sandbox workspace 为 cwd 运行 CodeBuddy CLI，并启用 Docker/OCI 容器隔离。
+9. 从 stdout 或 session JSONL 回收最终响应。
+10. 把 CodeBuddy 原始 session JSONL 原样复制为 `session.jsonl`。
+11. 复制 sandbox `output/` 到结果目录 `outputs/`。
+12. 运行 suite YAML 声明的 graders。
+13. 写入 `result.json`。
+14. 销毁 sandbox。
+
+如果 sandbox、Docker 或 CodeBuddy 容器运行能力不可用，case 失败并写入 `result.json`；不得退回宿主机裸跑。
+
+## Sandbox Shape
+
+运行时 CodeBuddy 面对的 workspace 固定为：
+
+```text
+<sandbox>/
+├── input/
+├── output/
+└── .workbuddy/
+    └── skills/
+        └── <skill-name>/
+            ├── SKILL.md
+            ├── references/
+            └── scripts/
+```
+
+不包含：
+
+- `instruction.md`
+- `EVAL_CASE_CONTEXT.md`
+- `.bin/`
+- `.runtime/`
+- 原始代码仓库
+- 用户主目录
+
+## Output
+
+命令 stdout 只返回批次摘要：
 
 ```json
 {
-  "batch_id": "20260625-101530-rollup-smoke",
-  "suite_id": "rollup-smoke",
-  "overall_status": "regressed",
+  "batch_id": "20260627-130214-revenue-recognition-real-smoke",
+  "status": "passed",
   "case_counts": {
-    "total": 3,
+    "total": 1,
+    "completed": 1,
     "passed": 1,
-    "correct_stop": 1,
-    "environment_failure": 1,
-    "regressed": 0
+    "failed": 0
   },
-  "artifacts": {
-    "batch_json": ".tmp/evals/20260625-101530-rollup-smoke/batch.json",
-    "summary_md": ".tmp/evals/20260625-101530-rollup-smoke/summary.md"
-  }
+  "batch_json": ".tmp/evals/revenue-real-smoke/20260627-130214-revenue-recognition-real-smoke/batch.json"
 }
 ```
 
-## Batch Directory Layout
+结果目录：
 
 ```text
 <output_root>/<batch_id>/
 ├── batch.json
-├── summary.md
-├── compare/
-│   ├── diff.json
-│   └── diff.md
 └── cases/
     └── <case_id>/
-        ├── run.json
-        ├── stdout.txt
-        ├── stderr.txt
-        ├── final.json
-        ├── transcript.jsonl        # 可选
-        ├── workspace/              # 独立运行工作目录或其引用
-        ├── evidence.md
-        └── scorecard.json
+        ├── result.json
+        ├── session.jsonl
+        └── outputs/
 ```
 
-## Isolation And Safety Rules
+## Session Capture
 
-首版批量运行入口必须遵守以下规则：
+harness 把 CodeBuddy / WorkBuddy 写出的原始 session JSONL 原样复制为结果目录的 `session.jsonl`，作为 Agent 轨迹的唯一事实源。不做事件归一化、不重命名类型、不屏蔽路径、不丢弃字段（包括 `reasoning`、`providerData`、`sessionId` 等）。事件类型与字段以 CodeBuddy 原始为准。
 
-- 不同 case 之间不得共享工作目录
-- 评分只读取本次 `run_id` 目录中的证据
-- 未声明安全环境的 case，默认视为只读评测
-- 若被测 Agent 试图触发 upload 或真实外部写操作，且当前不满足 `approved_write` 条件，应直接阻断并记录为安全策略阻断
+Windows 上 CodeBuddy state 路径可能超过 260 字符。runner 查找和复制 session 时必须支持 Windows 扩展长路径，能读取 `codebuddy-state/<case>/projects/<cwd-id>/*.jsonl` 这类深层路径；写入结果包时仍使用普通相对路径 `session.jsonl`，不把扩展长路径前缀暴露给评测者。
 
-## Failure Classification Rules
+`session.jsonl` 是原始敏感证据，可能包含工具输出中的环境变量、凭据片段、绝对路径、provider 细节和 `reasoning`。结果包默认只用于本地复盘和受控归档；如采集到真实凭据，应先轮换凭据。
 
-首版必须固定输出以下归因枚举之一：
-
-- `skill_behavior`
-- `wrapped_tool`
-- `runtime_environment`
-- `harness_system`
-
-不可出现“失败了，但不知道为什么”的空白归因。
+如果某条 case 未捕获到 session（环境失败或 CodeBuddy 未写出 session 文件），`session.jsonl` 不生成，`result.json` 的 `evidence.missing` 记为 `codebuddy_session_jsonl`。

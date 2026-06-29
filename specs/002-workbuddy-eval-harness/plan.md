@@ -1,284 +1,271 @@
-# Implementation Plan: 收入确认 WorkBuddy 自动化评测底座
+# Implementation Plan: WorkBuddy / CodeBuddy Eval Harness
 
-**Branch**: `002-workbuddy-eval-harness` | **Date**: 2026-06-25 | **Spec**: [spec.md](./spec.md)
-
-**Input**: Feature specification from `/specs/002-workbuddy-eval-harness/spec.md`
+**Branch**: `002-workbuddy-eval-harness` | **Date**: 2026-06-28 | **Spec**: [spec.md](./spec.md)
 
 ## Summary
 
-本 feature 要交付一套面向 Agent 的评测底座，用来对运行在 WorkBuddy / CodeBuddy 同核
-环境中的收入确认 skill 做可重复、可批量、可对比的自动化评测。首版采用
-CodeBuddy CLI 官方无头模式作为自动化执行面，围绕稳定 case 清单、批量运行器、证据包、
-自动评分卡、评分器配置、隔离工作目录、基线快照和回归视图建立统一产物契约。
+本 feature 交付一套面向评测执行者的最小 eval harness：每条 case 以文件夹组织，在一次性 sandbox workspace 中由 CodeBuddy CLI 真实运行，并生成固定、简洁、可复盘的结果包。
 
-设计重点不是“把一次脚本跑通”，而是把评测闭环搭成长期资产：
+首版保留的能力：
 
-- 同一组 case 可以被重复重跑，并保留稳定身份。
-- 每次运行都会落下结构化结果、证据引用和失败归因。
-- 评分以受控注册的确定性评分器为主，以 Rubric 和人工校准为辅。
-- 每条 case 在独立工作目录中执行，默认只读，并通过显式安全闸门阻断真实外部写风险。
-- 首版优先覆盖收入确认 SOP 第 3 步“汇总”的 validate / preview 场景。
-- upload 仅在 case 明确声明安全环境时才进入评测范围。
+- suite YAML 只定义 `suite_id`、`graders` 和 `cases`。
+- 每条 case 是一个文件夹，包含 `instruction.md`、`skills/` 和 `input/`。
+- 每条 case 运行时在公开结果包之外创建一次性 sandbox workspace，并在结束后销毁。
+- sandbox 内按 WorkBuddy 形态提供 `.workbuddy/skills/<skill-name>/`。
+- `instruction.md` 原文进入首条用户消息的 `<user_query>`，不复制进 workspace。
+- 启动上下文尽量还原 WorkBuddy session 中观察到的 `system-reminder` 结构。
+- 使用 CodeBuddy CLI 无头模式运行真实模型。
+- 默认通过 Docker/OCI 容器强隔离当前 case workspace；CodeBuddy 权限参数只作为辅助护栏。
+- grader 做 0/1 二元评分，结果写回 `result.json.graders[]`。
+- 输出固定为 `batch.json`、`cases/<case_id>/result.json`、`cases/<case_id>/session.jsonl` 和 `cases/<case_id>/outputs/`。
+
+首版明确不做：
+
+- 仅依赖 CodeBuddy 权限体系作为主要隔离边界。
+- baseline 保存与比较。
+- Markdown 报告。
+- 重复 JSON 视图。
+- 多套 profile。
+- fake runner 作为用户路径。
+- upload 或真实外部写入评测。
+- 在原始代码仓库 cwd 中裸跑 Agent。
+- 由 harness 生成 `.bin/`、`.runtime/` 或 `EVAL_CASE_CONTEXT.md` 来补运行能力。
+
+判断原则：如果删掉某个字段、文件或参数后，评测仍然能定义、隔离运行、评分和复盘，就不进入首版。
 
 ## Technical Context
 
-**Language/Version**: Python 3.13.2（harness 编排、评分器、产物落盘） + Node.js 18+（CodeBuddy CLI 运行时）
+**Language/Version**: Python 3.13.2（harness 编排、评分、结果落盘） + Node.js 18+（CodeBuddy CLI 运行时）
 
-**Primary Dependencies**: 现有仓库 Python 技术栈（Typer、Pydantic、pytest）、CodeBuddy CLI（`codebuddy` / `cbc`）、可选 `jq`（本地结果查看）、可选 OpenTelemetry Collector
+**Primary Dependencies**: 现有仓库 Python 技术栈（Typer、Pydantic、pytest）、CodeBuddy CLI（`codebuddy` / `cbc`）
 
-**Storage**: 仓库内本地文件系统工件为主，包括 case manifest、批次运行目录、证据包、评分结果、基线快照和 Markdown 摘要；可选接入外部 OTLP Collector 保存 trace
+**Storage**: 本地文件系统。每次运行生成一个批次目录；每条 case 结果写入自己的结果目录。临时 sandbox 不属于结果包，运行后销毁。
 
-**Testing**: pytest 单元测试、契约测试、集成测试；至少 3 条代表性 case 的 smoke batch；基线保存/比较测试；fake runner + fixture 驱动的评分器测试
+**Testing**: pytest 单元测试、契约测试、集成测试；真实 CodeBuddy CLI 堂食收入单 case 冒烟测试在本机 Docker、CodeBuddy 登录态和 skill 运行前提满足时必须跑通。
 
-**Target Platform**: 首版自动化执行目标为 CodeBuddy CLI 无头模式，验证 WorkBuddy 同核行为；本地开发以 Windows 为主，设计需兼容 Linux 上的 CLI 自动化
+**Target Platform**: 本地 Windows 开发环境发起评测；case 实际运行在一次性本地 sandbox workspace 中。workspace 不暴露原始代码仓库和用户主目录。
 
-**Project Type**: 可复用 Python 包 + 仓库级 CLI 入口 + 文件系统工件契约
+**Project Type**: Python 包 + 仓库级 CLI 入口 + 文件系统结果契约 + Docker/OCI 容器隔离边界。
 
-**Performance Goals**: 首版 3 条代表性 case 的 smoke batch 在稳定本地环境下应于 15 分钟内完成；单 case 在运行结束后 60 秒内完成证据整理；smoke 规模下基线 diff 在 30 秒内可得
+**Performance Goals**: 单条真实 CodeBuddy 冒烟 case 能在稳定本地环境下完成；运行结束后 60 秒内完成证据整理、产物复制和评分。
 
 **Constraints**:
 
-- 无头执行必须基于官方 `-p/--print` 入口，而不是依赖 WorkBuddy GUI 自动点选。
-- 需要结构化输出，首版标准输出为 `json`，深度留痕时补充 `stream-json`。
-- 官方文档要求：无头执行若涉及文件读写、命令执行、网络请求等授权动作，需在受信环境下显式带 `-y/--dangerously-skip-permissions`。
-- 评分应优先看结果和关键守卫，而不是僵硬检查完整工具路径。
-- trial 之间必须隔离，不能让上一轮会话、临时文件或外部副作用影响下一轮结果。
-- telemetry 默认应最小化，prompt 内容、工具参数和工具内容记录都必须保持 opt-in。
-- 未显式声明安全环境的 case 不得默认触发 upload 风险。
-
-**Scale/Scope**: 首版最低验收是 3 条代表性 rollup case；设计应能平滑扩展到 20-50 条 capability eval，以及后续不断增长的 regression suite，而不改主契约
-
-## Constitution Check
-
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
-
-- [PASS] 核心能力先行，可复用优先：评测底座与被测 skill、仓库本地启动器、WorkBuddy / CodeBuddy 适配层分离，避免把评测逻辑写进业务 skill 包装脚本。
-- [PASS] Agent 调用契约稳定且可机读：case manifest、批量运行、结果包和基线快照都以结构化契约对外，支持人和 Agent 共用。
-- [PASS] 规格驱动渐进交付：先做最小可用默认设置和 3 条代表性 case，再按能力评测到回归评测的节奏扩展，不追求一次做全。
-- [PASS] 可验证、可观测、可追踪：每个 case 都有运行记录、证据包、评分卡和失败归因；CLI `json` / `stream-json` 与可选 OTel trace 共同支撑复盘。
-- [PASS] 安全优先、简单实现、显式配置：upload 默认关闭；telemetry 内容采集默认关闭；扩展评分和留痕通过显式配置接入，不用隐式魔法。
-
-设计后复核结论：Phase 1 设计仍满足以上原则，无需记录宪章偏离项。
+- 用户发起命令固定为 `run_skill_eval_batch --suite <suite.yaml> --output_root <output-dir>`。
+- 每条 case 必须在一次性 sandbox workspace 中运行，不能退回宿主机裸跑。
+- sandbox 不挂载原始代码仓库和用户主目录。
+- 业务产物只允许写入 sandbox `output/`，结束后复制到结果目录 `outputs/`。
+- `instruction.md` 不作为文件出现在 workspace 中。
+- skill 的可运行脚本必须由 skill 自己的 `scripts/` 提供并说明前提，harness 不生成隐藏运行时。
+- 结果读取入口固定，不用额外报告文件解释同一批结果。
+- token、成本等底层 CLI 暂时拿不到的指标仍保留字段，并写为 `null`。
 
 ## Project Structure
 
-### Documentation (this feature)
+### Documentation
 
 ```text
 specs/002-workbuddy-eval-harness/
+├── README.md
 ├── plan.md
-├── research.md
+├── spec.md
 ├── data-model.md
 ├── quickstart.md
 ├── contracts/
 │   ├── case-manifest.md
 │   ├── run-eval-batch.md
-│   ├── result-bundle.md
-│   └── baseline-snapshot.md
+│   └── result-bundle.md
+├── examples/
+│   └── revenue-recognition-real-smoke/
+│       ├── suite.yaml
+│       └── cases/
+│           └── revenue-recognition-dine-in-202605/
+│               ├── instruction.md
+│               ├── skills/
+│               └── input/
 └── tasks.md
 ```
 
-### Source Code (repository root)
+### Source Code
 
 ```text
-skill/
-└── revenue-recognition/
-    ├── SKILL.md
-    └── references/
-
 src/
 ├── cli/
-├── core/
+│   └── run_skill_eval_batch.py
 ├── evals/
-│   ├── cli/
 │   ├── cases/
-│   ├── runners/
 │   ├── evidence/
 │   ├── graders/
-│   ├── baselines/
-│   └── reports/
-├── integrations/
-│   ├── codebuddy_cli/
-│   └── feishu_bitable/
-├── models/
-└── utils/
-
-tests/
-├── contract/
-│   └── eval_harness/
-├── integration/
-│   └── eval_harness/
-└── unit/
-    └── eval_harness/
+│   ├── runners/
+│   ├── sandbox/
+│   └── shared/
+└── integrations/
+    └── codebuddy_cli/
 ```
 
-**Structure Decision**: 保持单一 Python 项目结构，在现有 `src/cli`、`src/core` 之外新增
-`src/evals/` 作为评测底座的核心实现层；`src/integrations/codebuddy_cli/` 负责封装
-CodeBuddy / WorkBuddy 同核运行时的调用细节；被测收入确认 skill 继续保留在
-`skill/revenue-recognition/`，不与 harness 核心混写。
+## Design
 
-## Phase 0 Research Output
+### 1. 评测集输入
 
-Phase 0 已将以下关键不确定项收敛到 [research.md](./research.md)：
+suite YAML 只保留三块：
 
-- 为什么首版应以 CodeBuddy CLI 无头模式而非 GUI 作为自动化入口
-- 为什么需要把 `json` 结果、`stream-json` 转录和 OTel traces 拆成“必选最小证据”和“可选深度证据”
-- 为什么评分应采用 `code > rubric > human` 的分层，而不是一开始全部交给模型判断
-- 为什么“正确止步”必须作为独立通过类型，而不是落入普通失败
-- 为什么 capability eval 通过后要毕业为 regression eval，而不是一次性临时验证
+```yaml
+suite_id: revenue-recognition-real-smoke
+graders:
+  - preview_file_exists
+cases:
+  - revenue-recognition-dine-in-202605
+```
 
-## Phase 1 Design
+case 的任务说明、skill 和输入文件放在 case 文件夹里：
 
-### 1. Batch Runner Design
+```text
+cases/<case_id>/
+├── instruction.md
+├── skills/
+│   └── <skill-name>/
+│       ├── SKILL.md
+│       ├── references/
+│       └── scripts/
+└── input/
+```
 
-首版 runner 负责读取稳定 case 清单，并为每个 case 生成独立 trial：
+### 2. Sandbox Materialize
 
-1. 读取 suite manifest 与默认/扩展设置。
-2. 为每个 case 计算唯一 `run_id`，并创建独立 `workspace_dir` 与结果目录。
-3. 按 `workspace_mode` 将输入材料显式 materialize 到该目录，避免共享运行上下文。
-4. 通过 CodeBuddy CLI 无头模式发起运行，标准输出使用 `json`。
-5. 当需要更深证据时，额外保存 `stream-json` transcript 或开启 OTel trace。
-6. 按写策略和安全环境声明决定是否允许外部写动作。
-7. 将执行结果归类为：通过、正确止步、环境失败、证据不足、skill/工具失败、harness 失败。
+每条 case 运行前，harness 创建一次性 sandbox workspace：
 
-### 2. Evidence Design
+```text
+<sandbox>/
+├── input/
+├── output/
+└── .workbuddy/
+    └── skills/
+        └── <skill-name>/
+            ├── SKILL.md
+            ├── references/
+            └── scripts/
+```
 
-证据分成两层：
+case 源目录中的 `skills/<skill-name>/` 会复制到 sandbox 的 `.workbuddy/skills/<skill-name>/`。`instruction.md` 只作为首条用户消息内容使用，不进入 workspace 文件系统。
 
-- 最小必备层：批次元数据、CLI 命令、stdout/stderr、`session_id`、最终 JSON 结果、失败归因、证据完整性标记。
-- 可选扩展层：`stream-json` transcript、OTel traces、更多工具输入输出细节、人工摘要增强。
+sandbox 不生成：
 
-这样做的原因是：首版必须先保证“每轮必然有可比较结果”，而不是一上来把所有深度留痕都做成 hard dependency。
+- `instruction.md`
+- `EVAL_CASE_CONTEXT.md`
+- `.bin/`
+- `.runtime/`
 
-### 3. Grader Design
+### 3. WorkBuddy 上下文还原
 
-评分采用“注册评分器 + 配置装配 + 统一评分卡”的设计。
+已观察到的 WorkBuddy session 中，生产上下文不是独立 `role=system`，而是第一条 `role=user` 消息内的 `system-reminder` 块。harness 因此采用普通输入注入方式，而不是伪造第二套 system prompt。
 
-评分器结构分三层：
+启动输入包含：
 
-- 确定性评分器：负责结果分类、必需字段、关键边界、必需/禁止行为、证据完整性、环境失败识别。
-- Rubric 评分器：负责任务理解、结果解读、摘要质量等较软维度，输出结构化理由。
-- 人工评分器：只用于 baseline 晋升、Rubric 校准和争议 case 复核，不作为每轮主路径。
+- `user_info`：操作系统、shell、主题和 workspace 读写边界提示。
+- `identity_context`：默认 WorkBuddy 身份模板。
+- `product_identity`：`You are WorkBuddy, a powerful AI assistant.`
+- `project_context`：sandbox workspace 文件结构摘要。
+- `additional_data`：固定评测时间和 connector status；connector 默认全部 `disconnected`。
+- `memory_and_skills_reminder`：WorkBuddy 可见提醒，但约束读写仍在 sandbox 内。
+- `manually_attached_skills`：仅当 `instruction.md` 中出现 `/<skill-name>` 时注入。
+- `user_query`：`instruction.md` 原文。
 
-评分强调“结果和关键约束”而不是“完整路径照搬”。例如：如果 case 的正确行为是澄清、阻断或拒绝越界执行，只要边界与结论正确，就应视为通过。
+如果 CodeBuddy CLI 的 Skill 工具不能直接加载 sandbox skill，prompt 中必须提供 `.workbuddy/skills/<skill-name>/SKILL.md` 的显式路径作为降级入口。
 
-评分器装配方式如下：
+### 4. 批量运行流程
 
-1. 每个 `ScoreDimension` 必须绑定到一个具体 `grader_id`。
-2. `EvalSettingsProfile` 负责声明本轮启用哪些评分器、执行顺序和是否为默认评分器。
-3. 评分执行顺序固定为：
-   - 先运行确定性评分器，产出硬门禁结果与关键标签
-   - 再运行 Rubric 评分器，补足软维度理由
-   - 最后仅在需要时挂入人工复核结论
-4. `ScoreCard` 需要同时保存：
-   - 各评分器原始输出
-   - 汇总后维度分数
-   - 评分器版本
-   - 是否因证据缺失而降级评分
+runner 流程固定：
 
-首版评分器集合分成两类：
+1. 读取 suite YAML。
+2. 验证每个 case 文件夹包含 `instruction.md`、`skills/` 和 `input/`。
+3. 为当前 case 创建 sandbox workspace。
+4. 复制 `input/`，创建 `output/`，按 WorkBuddy 风格 materialize skill。
+5. 生成 WorkBuddy 风格 `system-reminder` + `<user_query>` 首条用户消息。
+6. 以 sandbox workspace 为 cwd 运行 `codebuddy -p <prompt> --sandbox container --sandbox-new --sandbox-kill --output-format json`。
+7. 从 stdout 或 session JSONL 回收最终响应。
+8. 将 CodeBuddy 写出的原始 session JSONL 原样复制为结果目录的 `session.jsonl`。
+9. 将 sandbox `output/` 复制到结果目录 `outputs/`。
+10. 执行 suite YAML 声明的 graders。
+11. 写入 `result.json`。
+12. 销毁 sandbox。
+13. 汇总写入 `batch.json`。
 
-- 默认评分器：随 harness 开箱即用，覆盖 `task_understanding`、`tool_selection`、`parameter_completeness`、`result_interpretation`、`failure_handling`、`boundary_compliance`
-- 扩展评分器：通过 `EvalSettingsProfile` 以增量方式挂入，例如新证据类型、新安全维度、新成本维度
+### 5. 结果文件
 
-可自定义评分器通过受控配置插槽扩展，而不是任意脚本热插拔：
+结果目录固定为：
 
-- 新增评分器要先注册 `grader_id`
-- 声明输入依赖（读哪些证据）
-- 声明输出 schema（吐什么结构）
-- 再由 `EvalSettingsProfile` 决定是否启用
+```text
+<output_root>/<batch_id>/
+├── batch.json
+└── cases/
+    └── <case_id>/
+        ├── result.json
+        ├── session.jsonl
+        └── outputs/
+```
 
-这样既保留扩展能力，又保持结果可比、可审计和可回归。
+`batch.json` 回答：整批是否跑完、总 case 数、完成数、通过数、失败数、整体耗时、token 和成本。
 
-### 4. Isolation And Safety Design
+`result.json` 回答：单条 case 是否完成、模型最终回答、grader 如何打分、耗时、token、成本、session 和 outputs 是否缺失。
 
-隔离与安全设计围绕“会话独立、目录独立、副作用受控”三个目标展开。
+`session.jsonl` 回答：CodeBuddy 原始记录了哪些用户消息、Agent 回复、工具调用、工具返回、provider 元数据、`reasoning` 和 session 标识。
 
-环境隔离拆成三层：
+`outputs/` 保存业务产物本身，例如 preview Excel。
 
-1. **会话隔离**
-   - 每条 case 独立 `session_id`
-   - 不复用上一条 case 的对话上下文
+### 6. Session
 
-2. **工作目录隔离**
-   - 每条 case 必须 materialize 到独立 `workspace_dir`
-   - 运行输入使用复制、链接或引用策略显式落入该目录
-   - harness 自己生成的中间文件、stdout/stderr、transcript 只写入该 case 目录
-   - 运行结束后必须产出 `cleanup_status`，说明临时目录是否已清理
+`session.jsonl` 来源不是 harness 猜测事件流，也不是归一化轨迹，而是 CodeBuddy / WorkBuddy 写出的原始 session JSONL。
 
-3. **副作用隔离**
-   - 默认使用只读/低权限工具集合
-   - 默认禁用 upload、真实外部写操作和不在白名单内的命令
-   - 只有 case 显式声明 `safe_environment_required=true` 且 runner 校验通过时，才允许进入写路径
+规则：
 
-首版安全闸门至少包括：
+- 直接复制 CodeBuddy 原始 session 文件，不做事件归一化。
+- 不重命名事件类型，不屏蔽路径，不丢弃字段。
+- 保留 `message`、`function_call`、`function_call_result`、`reasoning`、`providerData`、`sessionId`、时间戳、工具参数和工具输出。
+- session 缺失时不合成假的轨迹文件，只在 `result.json.evidence.missing` 中记录 `codebuddy_session_jsonl`。
+- Windows 上 CodeBuddy state 路径可能超过 260 字符，采集实现必须支持扩展长路径读取；结果包中仍只暴露普通相对路径 `session.jsonl`。
+- `session.jsonl` 可能包含环境变量、凭据片段、绝对路径、provider 细节和 `reasoning`，结果包应按敏感证据管理。
 
-- `allow_write_operations=false` 时，不向底层 CLI 注入允许写外部系统的工具权限
-- `allow_upload=false` 时，任何尝试调用 upload 的行为都应在评分和运行控制中视为越界
-- 若 case 需要真实写环境，runner 必须先校验：
-  - 当前目标表是否为影子表 / 安全表
-  - 当前凭证是否属于受控环境
-  - 当前运行模式是否被显式批准
-- 若以上任一条件不成立，应直接阻断并归类为 `runtime_environment`，而不是冒险执行
+### 7. 评分器
 
-对本地残留的处理策略：
+grader 只输出 `1` 或 `0`。`verdict` 规则固定：所有 grader 都为 `1` 时是 `pass`，只要有一个 grader 为 `0` 就是 `fail`。
 
-- harness 不能假设工作区天然干净
-- 每个 case 的输入目录和输出目录必须分离
-- 评分只读取本次 `run_id` 目录下的证据，不读取“最近一次运行目录”
-- 若清理失败，应在结果中显式记录，但不能悄悄复用旧产物
+首版示例：
 
-首版不以强虚拟化沙箱为前提，而是先建立“默认只读、独立目录、显式安全闸门、可审计副作用”四层防线。
+```yaml
+graders:
+  - preview_file_exists
+```
 
-### 5. Baseline Design
+扩展 grader 必须遵守：
 
-baseline 不是单纯保存一个分数，而是保存：
+- 可以读取 `result.json`、`session.jsonl`、`outputs/` 或受控远端结果。
+- 输出写回 `result.json.graders[]`。
+- `score` 只能是 `1` 或 `0`。
+- 不新增额外结果文件。
 
-- case 身份与版本
-- scorer 版本
-- skill / prompt / environment 指纹
-- 每条 case 的运行结论、评分卡和证据引用
+### 8. 安全边界
 
-后续比较输出至少区分：
+首版评测按受控 workspace 思路运行。目标是验证 Agent 是否能理解任务、读取 skill、处理给定 input、生成 output、遵守边界，而不是验证真实外部写入或 upload。
 
-- `regressed`：出现新增失败或评分下降
-- `fixed`：上轮失败、本轮修复
-- `unchanged`：无实质变化
-- `not_comparable`：版本差异或证据缺失导致不可比
+不允许：
 
-### 6. Failure Attribution Design
+- 将仓库根目录作为 tool-root 暴露给 Agent。
+- 将用户主目录挂载或加入 CodeBuddy workspace。
+- 在 sandbox 之外写业务产物。
+- 失败时退回宿主机裸跑。
+- 默认执行 upload。
+- 通过 `.bin/` 或 `.runtime/` 临时把仓库运行时注入 workspace。
+- 把 CodeBuddy 权限检查当作主要隔离边界，绕过 Docker/OCI 容器运行。
 
-首版归因分类固定为四大类：
-
-- `skill_behavior`：skill 提示、推理或边界遵守问题
-- `wrapped_tool`：skill 包装脚本或底层汇总工具问题
-- `runtime_environment`：WorkBuddy / CodeBuddy 运行环境、权限、凭证、安装缺失问题
-- `harness_system`：评测底座自身的 runner、grader、artifact 逻辑问题
-
-这四类会同时进入单 case 结果和批次聚合摘要，帮助产品与研发直接回答“下一轮先改哪里”。
-
-## First Wave Delivery Strategy
-
-首版只聚焦最小却完整的闭环，不追求一开始覆盖整个收入确认 SOP：
-
-1. 先做 3 条代表性 rollup case：
-   - 成功跑通 `list_recog_items -> validate -> preview`
-   - 正确止步，不继续做下游收入确认
-   - 运行环境缺底层 CLI / 凭证，明确归类为环境失败
-2. 跑通批量发起、证据收集、自动评分、基线保存、回归比较五个主环节
-3. 等首批 case 稳定后，再扩展更多 rollup case
-4. upload 相关 case 仅在显式安全环境下纳入
+如果后续要评测真实写动作，需要新的安全方案和新的评测契约。
 
 ## Validation Strategy
 
-实现阶段的核心验证分三层：
+实现验收分四层：
 
-- 契约层：manifest、评分器定义、batch result、baseline snapshot 的 JSON / 文件结构稳定可解析，且包含隔离目录、清理状态、评分器版本等关键字段
-- 运行层：fake runner 与真实 headless runner 都能产出一致的主结果结构；不同 case 会写入独立 `workspace_dir`；未声明安全环境时会阻断 upload 或真实外部写；默认评分器与扩展评分器能够按顺序执行并汇总为统一评分卡
-- 回归层：相同 case 重跑后能输出逐 case、逐评分维度的 diff，并正确标记新增问题与修复项；评分器版本、证据类型扩展和环境指纹变化会进入 baseline compare 的可比性判断
+- 契约层：suite YAML、case 文件夹、`batch.json`、`result.json`、`session.jsonl` 和 `outputs/` 字段稳定。
+- 隔离层：真实运行时 Agent 只能看到 sandbox workspace，不能看到仓库根目录或用户主目录。
+- 运行层：真实 CodeBuddy CLI 单 case 能跑通，并能拿到模型最终响应和 session。
+- 评分层：`preview_file_exists` 能基于 `outputs/` 给出 0/1 `score`，并由聚合规则生成 `verdict`。
 
-## Complexity Tracking
-
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| None | N/A | N/A |
+最终验收必须包含一次真实 CodeBuddy CLI 堂食收入 case 冒烟运行；如果当前 Docker、CodeBuddy 登录态或 skill 打包运行前提不满足，应明确判为环境失败，而不是降低隔离边界。

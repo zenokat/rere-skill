@@ -1,0 +1,5 @@
+suite_id: revenue-recognition-real-smoke
+graders:
+  - preview_file_exists
+cases:
+  - revenue-recognition-dine-in-202605

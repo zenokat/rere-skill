@@ -1,114 +1,117 @@
-# Contract: 结果包与证据包
+# Contract: Result Bundle
 
-## Purpose
+## Directory
 
-结果包是本 feature 的统一输出契约。它需要同时满足：
+一次运行只暴露以下结果：
 
-- Agent 稳定读取
-- 人工快速复盘
-- 后续保存为 baseline
-- 后续做 regression diff
+```text
+<output_root>/<batch_id>/
+├── batch.json
+└── cases/
+    └── <case_id>/
+        ├── result.json
+        ├── session.jsonl
+        └── outputs/
+```
 
-## Canonical Files
+不生成 Markdown 报告、artifact index、agent-result、final、scorecard、baseline 或 diff 文件。
 
-### `batch.json`
+## batch.json
 
-批次级结构化总结果。
+```json
+{
+  "batch_id": "20260627-130214-revenue-recognition-real-smoke",
+  "suite_id": "revenue-recognition-real-smoke",
+  "status": "passed",
+  "case_counts": {
+    "total": 1,
+    "completed": 1,
+    "passed": 1,
+    "failed": 0
+  },
+  "metrics": {
+    "duration_ms": 48231,
+    "tokens": {
+      "input": null,
+      "output": null,
+      "total": null
+    },
+    "cost": {
+      "amount": null,
+      "currency": null
+    }
+  }
+}
+```
 
-至少包含：
+`batch.json` 只表达批次总体情况，不包含 case 数组。每条 case 的细节固定写在 `cases/<case_id>/result.json`。
 
-| Field | Type | Description |
-|---|---|---|
-| `batch_id` | string | 批次标识 |
-| `suite_id` | string | case 集标识 |
-| `overall_status` | string | `passed`、`regressed`、`environment_blocked`、`harness_error` |
-| `started_at` | datetime | 开始时间 |
-| `finished_at` | datetime | 结束时间 |
-| `target` | object | 被测 skill、runner、版本信息 |
-| `case_results` | list[object] | 每条 case 的摘要 |
-| `summary_counts` | object | 聚合计数 |
-| `artifacts` | object | 相关产物引用 |
+## result.json
 
-### `summary.md`
+```json
+{
+  "case_id": "revenue-recognition-dine-in-202605",
+  "status": "completed",
+  "verdict": "pass",
+  "score": 1,
+  "final_response": "Preview generated under output/preview.xlsx; upload was not run.",
+  "metrics": {
+    "duration_ms": 48231,
+    "tokens": {
+      "input": null,
+      "output": null,
+      "total": null
+    },
+    "cost": {
+      "amount": null,
+      "currency": null
+    }
+  },
+  "graders": [
+    {
+      "id": "preview_file_exists",
+      "type": "code",
+      "score": 1,
+      "summary": "Found a preview artifact under outputs/.",
+      "evidence": {
+        "file": "outputs/202605_dine_in_revenue.xlsx",
+        "size_bytes": 18642,
+        "sha256": "..."
+      }
+    }
+  ],
+  "evidence": {
+    "session_path": "session.jsonl",
+    "outputs_path": "outputs/",
+    "missing": []
+  }
+}
+```
 
-批次级面向人的摘要。
+`score` 只能是 `1` 或 `0`。`verdict` 固定由 graders 计算：全 1 为 `pass`，有 0 为 `fail`。
 
-至少回答三件事：
+## session.jsonl
 
-1. 这轮评测覆盖了什么
-2. 主要问题集中在哪
-3. 下一轮更应该先改 skill、工具、环境还是 harness
+`session.jsonl` 是 CodeBuddy / WorkBuddy 原始 session 的逐行原文，作为 Agent 轨迹的唯一事实源。harness 直接复制 CodeBuddy 写出的 session 文件，不做归一化、不屏蔽路径、不丢弃字段。事件类型与字段以 CodeBuddy 原始为准，常见包括 `message`（user/assistant）、`function_call`、`function_call_result`、`reasoning`，并保留 `providerData`、`sessionId`、时间戳等原始元数据。
 
-### `cases/<case_id>/run.json`
+由于它是原始证据，`session.jsonl` 可能包含工具输出中的环境变量、凭据片段、绝对路径、provider 细节和 `reasoning`。结果包应按敏感材料处理：默认只用于本地复盘和受控归档，不公开分享；如果真实凭据被采集进 session，应先轮换凭据。
 
-单 case 的主结果文件。
+```jsonl
+{"type":"message","role":"user","content":[{"type":"input_text","text":"<system-reminder data-role=\"user-context\">...</system-reminder>"}],"sessionId":"..."}
+{"type":"function_call","name":"Bash","callId":"call_001","arguments":"uv run scripts/run_recog_rollup.py --preview ...","sessionId":"..."}
+{"type":"function_call_result","name":"Bash","callId":"call_001","status":"completed","output":{"type":"text","text":"result_file=output/202605_dine_in_revenue.xlsx"},"sessionId":"..."}
+{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Preview generated under output/202605_dine_in_revenue.xlsx; upload was not run."}],"sessionId":"..."}
+```
 
-至少包含：
+如果 case 未捕获到 session，`session.jsonl` 不生成，`result.json` 的 `evidence.missing` 记为 `codebuddy_session_jsonl`。
 
-| Field | Type | Description |
-|---|---|---|
-| `case_id` | string | case 标识 |
-| `run_id` | string | 本次运行标识 |
-| `session_id` | string? | 会话 ID |
-| `workspace_dir` | string | 本次 case 独立工作目录 |
-| `cleanup_status` | string | 工作目录清理状态 |
-| `status` | string | 运行状态 |
-| `outcome_class` | string | 结果分类 |
-| `failure_source` | string? | 失败归因 |
-| `final_message` | string | 最终结论摘要 |
-| `evidence` | object | 证据文件引用 |
-| `scorecard_ref` | path | 评分卡路径 |
+## outputs/
 
-### `cases/<case_id>/scorecard.json`
+`outputs/` 是从 sandbox `output/` 复制出来的业务产物目录。
 
-单 case 的维度化评分结果。
+规则：
 
-至少包含：
-
-| Field | Type | Description |
-|---|---|---|
-| `total_score` | number | 总分 |
-| `final_verdict` | string | 最终结论 |
-| `grader_outputs` | list[object] | 评分器原始输出 |
-| `dimensions` | list[object] | 逐维度分数、理由、grader 类型 |
-| `evidence_gaps` | list[string] | 影响评分的证据缺口 |
-
-### `cases/<case_id>/evidence.md`
-
-面向人的证据导航页。
-
-至少列出：
-
-- CLI 调用摘要
-- `session_id`
-- transcript / trace / stdout / stderr / final JSON 的路径
-- 哪些证据缺失、会不会影响评分
-
-## Evidence Completeness
-
-结果包必须显式区分三种情况：
-
-- `complete`: 证据齐全
-- `partial`: 证据部分缺失，但还能形成有限评分
-- `failed`: 证据采集失败，无法可靠评分
-
-不要把 `partial` 默默伪装成完整成功。
-
-## Grader Compatibility Rule
-
-结果包必须允许同时容纳默认评分器和扩展评分器：
-
-- 默认评分器输出要稳定可比较
-- 扩展评分器输出可以增量增加，但必须带 `grader_id` 和 `version`
-- baseline compare 发现评分器集合或版本发生变化时，必须把该差异纳入可比性判断
-
-## Human + Agent Dual Consumption Rule
-
-同一轮评测不得维护两套完全不同的主结果格式。
-
-稳定主格式应是：
-
-- 机器主入口：`batch.json`、`run.json`、`scorecard.json`
-- 人工主入口：`summary.md`、`evidence.md`
-
-Markdown 只能作为阅读增强，不能替代 JSON 主契约。
+- 目录必须存在，可以为空。
+- 不额外生成 outputs 索引。
+- grader 证据引用使用 `outputs/...` 相对路径。
+- preview Excel 等业务产物直接保存在该目录中。
