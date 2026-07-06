@@ -93,6 +93,20 @@ def test_passes_when_script_called_with_flags(tmp_path: Path) -> None:
     assert result["evidence"]["match_count"] == 1
 
 
+def test_passes_when_uv_run_script_flag_points_to_skill_script(tmp_path: Path) -> None:
+    """Score 1 when ``uv run --script`` executes the skill script path."""
+
+    session = _write_session(tmp_path, [
+        _bash_event(
+            'uv run --script ".workbuddy/skills/revenue-recognition/scripts/list_recog_items.py"'
+        ),
+    ])
+    result = grade_skill_script_called(session_jsonl=session, script_name="list_recog_items")
+
+    assert result["score"] == 1
+    assert result["evidence"]["match_count"] == 1
+
+
 def test_passes_when_agent_cd_into_scripts_before_running_script(tmp_path: Path) -> None:
     """Score 1 when the agent runs the script after changing into scripts/."""
 

@@ -177,7 +177,7 @@ def _matches_script_path_invocation(command: str, script_name: str) -> bool:
     script_file = re.escape(f"{script_name}.py")
     pattern = re.compile(
         rf"{COMMAND_START_OR_SEPARATOR}"
-        rf"(?:uv\s+run\s+|python(?:\d(?:\.\d+)?)?\s+|py\s+)?"
+        rf"(?:uv\s+run\s+(?:--script\s+)?|python(?:\d(?:\.\d+)?)?\s+|py\s+)?"
         rf"[\"']?(?:\./)?(?:[^\s\"';&|]+/)*scripts/{script_file}[\"']?"
         rf"(?=$|[\s;&|])",
         re.IGNORECASE,
@@ -220,7 +220,7 @@ def _matches_bare_script_invocation(command: str, script_name: str) -> bool:
     script_file = re.escape(f"{script_name}.py")
     pattern = re.compile(
         rf"{COMMAND_START_OR_SEPARATOR}"
-        rf"(?:uv\s+run\s+|python(?:\d(?:\.\d+)?)?\s+|py\s+)?"
+        rf"(?:uv\s+run\s+(?:--script\s+)?|python(?:\d(?:\.\d+)?)?\s+|py\s+)?"
         rf"[\"']?(?:\./)?{script_file}[\"']?"
         rf"(?=$|[\s;&|])",
         re.IGNORECASE,

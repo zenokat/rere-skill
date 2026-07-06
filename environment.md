@@ -19,6 +19,7 @@
 - pytest 临时目录不要硬编码到 `tests/_pytest_tmp/`。在当前 Windows 受限沙盒中，该目录可能因为历史残留 ACL 或只读状态导致 `tmp_path` fixture 创建文件时报 `PermissionError`。稳定做法是让 `tests/conftest.py` 优先读取 `PYTEST_BASETEMP`，本地 Codex 运行时可显式设置到 `D:\tmp\rere-agent-pytest`，再退回仓库 `.tmp/pytest-tmp` 或系统临时目录。
 - pytest 在 Windows 受限沙盒中默认创建 per-test `tmp_path` 目录时，可能生成当前低权限 token 无法继续写入的 ACL；表现为 base temp 可写，但 `tmp_path / "file"` 或 `tmp_path / "child"` 报 `PermissionError`。稳定做法是在 `tests/conftest.py` 覆盖 `tmp_path` fixture，用 `mode=0o777` 和普通继承权限创建 per-test 目录，并在返回前做嵌套写入 probe。
 - eval harness 在 Windows 上不要把内部 sandbox 路径拼得过长。`output_root / batch_id / _sandboxes / case_id / .workbuddy / skills / ...` 这类路径很容易触发 `WinError 206 filename too long`，尤其 pytest 临时目录本身已经很长。稳定做法是公开结果路径保留完整 `case_id`，内部运行目录使用短目录名和 hash 后缀，例如 `_s/<case-prefix>-<hash>`。
+- 运行 `model.config_file: ${EVAL_MODELS_JSON}` 的 eval suite 前，优先把 `EVAL_MODELS_JSON` 写在仓库根目录本地 `.env` 中；`run_skill_eval_batch` 会先加载 `.env` / `.env.local`。若只在临时 PowerShell 会话里设置变量，通过 `Start-Process` 启动批量评测时也能继承，但这种做法容易遗忘。未配置时 harness 会在启动阶段报 `model.config_file references missing environment variable(s): EVAL_MODELS_JSON`。
 ## 2026-06-29 Codex / Docker 沙盒策略
 - 当前仓库的 eval harness 已经把单条 case 的主隔离边界交给 Docker/OCI 容器；外层 Codex 再使用 Windows `unelevated` restricted token 会拦截 Docker named pipe，并可能导致 `D:\tmp` 即使 NTFS ACL 放开也无法写入。
 - 历史尝试：曾尝试把用户级 `C:\Users\<user>\.codex\config.toml` 中 `[windows] sandbox = "unelevated"` 备份后注释掉，但这台机器上重启 Codex 会导致启动失败，必须改回才能进入会话。后续不要再把修改这个全局配置作为默认修复方案。

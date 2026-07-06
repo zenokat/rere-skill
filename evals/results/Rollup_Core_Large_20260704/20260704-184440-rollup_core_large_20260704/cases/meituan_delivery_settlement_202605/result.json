@@ -1,0 +1,145 @@
+{
+  "case_id": "meituan_delivery_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "汇总任务完成。以下是结果总结：\n\n---\n\n**结论：成功**\n\n| 项目 | 值 |\n|---|---|\n| **阶段** | preview（试算预览） |\n| **项目** | `meituan_delivery_settlement`（美团外卖回款） |\n| **期间** | 202605 |\n| **输入** | `input/美团外卖回款/`（9 个源文件） |\n| **产物** | `output/202605_meituan_delivery_settlement_20260704-190029.xlsx` |\n| **聚合行数** | 237 条门店级汇总记录 |\n| **字段数** | 7 个（期间、平台ID、结算id、平台服务费返还、实际回款、调整项、外卖账单结算金额） |\n| **警告** | 无 |\n\n**处理详情：**\n- 3 个\"全部门店\"大文件共处理约 **140 万行**订单明细（文件 0: 600,181 行, 文件 1: 600,095 行, 文件 2: 197,485 行）\n- 6 个独立门店文件（孝感麻糖米酒、蔡林记系列 5 家店）输出 0 行——它们的订单数据已被包含在\"全部门店\"文件中\n\n**产物位置：** `output/202605_meituan_delivery_settlement_20260704-190029.xlsx`\n\n**下一步：** 如需将汇总结果上传到飞书多维表，或进入下游\"收入回款确认\"阶段，请告知。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_meituan_delivery_settlement_20260704-190029.xlsx",
+        "sha256": "17c7bdbc1a200fff46612ab3eb9a9d86fb0479bf973a5a01992767771a4a4c4c",
+        "size_bytes": 15992
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 237,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "结算id",
+          "平台服务费返还",
+          "实际回款",
+          "调整项",
+          "外卖账单结算金额"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_meituan_delivery_settlement_20260704-190029.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID",
+          "结算id"
+        ],
+        "period": "202605",
+        "preview_count": 237,
+        "recog_id": "meituan_delivery_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblnuOGqHci3TRnr"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=meituan_delivery_settlement，period=202605，row_count=237。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/meituan_delivery_settlem-702918ef/.workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.p..."
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 3,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/meituan_delivery_settlem-702918ef/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/meituan_delivery_settlem-702918ef/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/meituan_delivery_settlem-702918ef/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=3。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/meituan_delivery_settlem-702918ef/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 2,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/meituan_delivery_settlem-702918ef/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/meituan_delivery_settlem-702918ef/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "duration_ms": 569478,
+        "duration_s": 569.5,
+        "margin_s": 330.5,
+        "max_seconds": 900
+      },
+      "id": "case_max_duration:900",
+      "score": 1,
+      "summary": "Case 用时 569.5s，阈值 900s — 通过。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 569478,
+    "tokens": {
+      "input": 42395,
+      "output": 475,
+      "total": 42870
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

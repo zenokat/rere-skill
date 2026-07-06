@@ -1,0 +1,148 @@
+{
+  "case_id": "eleme_delivery_revenue_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "---\n\n**结论：成功**\n\n| 项目 | 详情 |\n|---|---|\n| **阶段** | preview（汇总试算） |\n| **项目** | `eleme_delivery_revenue`（饿了么收入） |\n| **期间** | 202605（2026年5月） |\n| **输入** | `input/饿了么收入/`（15 个门店账单文件） |\n| **产物** | `output/202605_eleme_delivery_revenue_20260704-190626.xlsx` |\n| **行数** | 232 行（门店级汇总记录） |\n| **字段数** | 11 个基础事实字段 |\n| **警告** | 无 |\n\n**处理概况：**\n- 15 个源文件全部校验通过，涵盖蔡林记各门店及精粉世家、孝感麻糖米酒等品牌\n- 其中蔡林记主账单（`1780293102444`）最大，包含 315,882 条流水记录，单独处理约 3 分钟\n- 汇总耗时约 225 秒，生成 232 条门店级汇总记录\n\n**下一步：** 汇总产物是下游「收入回款确认」的字段原材料。目前汇总阶段已完成，如需查看具体金额或进一步确认，可打开输出文件 `output/202605_eleme_delivery_revenue_20260704-190626.xlsx` 审阅。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_eleme_delivery_revenue_20260704-190626.xlsx",
+        "sha256": "0e7ea584a17dd0f15c2b4edf9b5c3f9fcfeb95f5febf6e9b54e8bea3a586e7c3",
+        "size_bytes": 19350
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 232,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "商品金额",
+          "打包费",
+          "商家应收配送费",
+          "商家活动补贴",
+          "商家代金券补贴",
+          "商家智能补贴",
+          "智能满减津贴",
+          "智能特价菜补贴",
+          "爆单红包增量出资"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_eleme_delivery_revenue_20260704-190626.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID"
+        ],
+        "period": "202605",
+        "preview_count": 232,
+        "recog_id": "eleme_delivery_revenue",
+        "sample_differences": [],
+        "target_table_id": "tbl78CSsQ23uDG0S"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=eleme_delivery_revenue，period=202605，row_count=232。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"<redacted:rere_eval_sandbox_root>/20260704-184440-rollup_core_large_20260704/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.p..."
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 3,
+        "sample_commands": [
+          "cd \"<redacted:rere_eval_sandbox_root>/20260704-184440-rollup_core_large_20260704/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p...",
+          "cd \"<redacted:rere_eval_sandbox_root>/20260704-184440-rollup_core_large_20260704/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p...",
+          "cd \"<redacted:rere_eval_sandbox_root>/20260704-184440-rollup_core_large_20260704/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=3。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"<redacted:rere_eval_sandbox_root>/20260704-184440-rollup_core_large_20260704/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 2,
+        "sample_commands": [
+          "cd \"<redacted:rere_eval_sandbox_root>/20260704-184440-rollup_core_large_20260704/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p...",
+          "cd \"<redacted:rere_eval_sandbox_root>/20260704-184440-rollup_core_large_20260704/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "duration_ms": 350190,
+        "duration_s": 350.2,
+        "margin_s": 549.8,
+        "max_seconds": 900
+      },
+      "id": "case_max_duration:900",
+      "score": 1,
+      "summary": "Case 用时 350.2s，阈值 900s — 通过。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 350190,
+    "tokens": {
+      "input": 40404,
+      "output": 328,
+      "total": 40732
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

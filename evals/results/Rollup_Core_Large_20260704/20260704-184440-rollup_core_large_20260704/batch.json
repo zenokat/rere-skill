@@ -1,0 +1,43 @@
+{
+  "batch_id": "20260704-184440-rollup_core_large_20260704",
+  "case_counts": {
+    "completed": 5,
+    "failed": 0,
+    "passed": 5,
+    "total": 5
+  },
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 2072283,
+    "tokens": {
+      "input": 220065,
+      "output": 2154,
+      "total": 222219
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "requested": "deepseek-v4-pro"
+  },
+  "status": "passed",
+  "suite": {
+    "fingerprint": "sha256:eb1c93afbcd2cd20",
+    "graders": [
+      "preview_file_exists",
+      "preview_matches_baseline",
+      "skill_script_called:list_recog_items",
+      "skill_script_called:run_recog_rollup",
+      "skill_script_args:run_recog_rollup:--validate",
+      "skill_script_args:run_recog_rollup:--preview",
+      "case_max_duration:900"
+    ],
+    "source_path": "D:\\AI\\rere-agent\\evals\\datasets\\Rollup_Core_Large_20260704\\suite.yaml"
+  },
+  "suite_id": "Rollup_Core_Large_20260704"
+}

@@ -1,0 +1,153 @@
+{
+  "case_id": "jingdong_delivery_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "汇总完成。以下是结果总结：\n\n---\n\n**结论：成功**\n\n| 项目 | 值 |\n|------|-----|\n| **阶段** | preview（试算预览） |\n| **项目** | `jingdong_delivery_settlement`（京东外卖回款） |\n| **期间** | 202605（2026年5月） |\n| **源文件** | `input/京东外卖回款/`（4个文件，340,569条流水） |\n| **产物** | `output/202605_jingdong_delivery_settlement_20260704-191809.xlsx` |\n| **汇总行数** | 188行（按\"平台ID+收款账号+收款户名\"分组） |\n| **字段数** | 16 |\n\n---\n\n### 关键金额汇总\n\n| 字段 | 金额（元） |\n|------|----------|\n| 实际回款 | **1,359,631.61** |\n| 商家承担运费补贴 | -61,496.00 |\n| 配送费开票 | -177,172.63 |\n| 总佣金 | -79,631.43 |\n| 保险费 | -27,324.54 |\n| 保险理赔 | 1,125.75 |\n| 赔付 | 248.37 |\n| 未结算金额 | 59,088.27 |\n| 已结算金额 | **1,300,543.34** |\n| 跨月结算金额 | 0.00 |\n\n---\n\n### 收款主体\n\n- 武汉蔡林记餐饮管理有限公司\n- 武汉市蔡林记餐饮发展有限公司\n- 蔡林记（深圳）餐饮管理有限公司\n- 蔡林记（郑州）餐饮管理有限公司\n- 深圳市乐达永溢餐饮管理有限公司\n\n---\n\n198个门店、4个源文件中提取了总计 **1,359,631.61元** 的实际回款，其中已结算 **1,300,543.34元**，尚有 **59,088.27元** 未结算。汇总文件已输出到 `output/` 目录，可作为下游收入回款确认的入参。如需上传到飞书业务表，请告知。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_jingdong_delivery_settlement_20260704-191809.xlsx",
+        "sha256": "e84b659f35f3efea674bad38a1cc8fbf884a07b54ecf8b140d64804782d22878",
+        "size_bytes": 22917
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 188,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "收款账号",
+          "收款户名",
+          "实际回款",
+          "商家承担运费补贴",
+          "配送费开票",
+          "商家承担小费",
+          "平台运费补贴",
+          "赔付",
+          "总佣金",
+          "-保险费",
+          "保险理赔",
+          "未结算金额",
+          "跨月结算金额",
+          "已结算金额"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_jingdong_delivery_settlement_20260704-191809.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID",
+          "收款账号",
+          "收款户名"
+        ],
+        "period": "202605",
+        "preview_count": 188,
+        "recog_id": "jingdong_delivery_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblQkl5JlhKAcBAB"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=jingdong_delivery_settlement，period=202605，row_count=188。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/jingdong_delivery_settle-6b841733/.workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.p..."
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 2,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/jingdong_delivery_settle-6b841733/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/jingdong_delivery_settle-6b841733/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/jingdong_delivery_settle-6b841733/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-184440-rollup_core_large_20260704/workspaces/jingdong_delivery_settle-6b841733/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.p..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "duration_ms": 391113,
+        "duration_s": 391.1,
+        "margin_s": 508.9,
+        "max_seconds": 900
+      },
+      "id": "case_max_duration:900",
+      "score": 1,
+      "summary": "Case 用时 391.1s，阈值 900s — 通过。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 391113,
+    "tokens": {
+      "input": 47540,
+      "output": 481,
+      "total": 48021
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

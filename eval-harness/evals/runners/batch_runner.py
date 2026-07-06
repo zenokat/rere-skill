@@ -8,6 +8,8 @@ remove the sandbox.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import shutil
 import time
@@ -28,11 +30,23 @@ from evals.graders.preview_file_exists import grade_preview_file_exists
 from evals.graders.skill_script_called import grade_skill_script_called
 from evals.graders.skill_script_args import grade_skill_script_args
 from evals.reports.serializers import write_json
+from evals.runners.background_tasks import (
+    PendingBackgroundTasks,
+    find_pending_background_tasks,
+    has_pending_background_tasks,
+)
 from evals.sandbox.case_sandbox import CaseSandboxBuilder, copy_outputs_to_result, remove_sandbox
 from evals.shared.ids import make_batch_id
 from evals.shared.output_layout import CaseArtifactLayout, OutputLayout
 from evals.shared.windows_paths import as_filesystem_path
 from integrations.codebuddy_cli.headless_runner import CodeBuddyHeadlessRunner, HeadlessRunner, HeadlessRunResult
+
+
+DEFAULT_BACKGROUND_OUTPUT_WAIT_SECONDS = 300
+BACKGROUND_OUTPUT_WAIT_SECONDS_ENV = "RERE_EVAL_BACKGROUND_WAIT_SECONDS"
+BACKGROUND_OUTPUT_POLL_SECONDS = 5.0
+BACKGROUND_OUTPUT_STABLE_SECONDS = 1.0
+BUSINESS_OUTPUT_SUFFIXES = {".xlsx", ".xls", ".csv", ".json"}
 
 
 @dataclass(frozen=True)
@@ -54,6 +68,29 @@ class RuntimeModelRequest:
     id: str | None
     config_file: Path | None = None
     config_fingerprint: str | None = None
+
+
+@dataclass(frozen=True)
+class BackgroundOutputWaitResult:
+    """Result of waiting for artifacts from an unfinished background task.
+
+    Args:
+        task_ids: Pending CodeBuddy background task ids observed in the
+            session.
+        waited_ms: Wall-clock milliseconds spent waiting for business output
+            artifacts after CodeBuddy returned.
+        timed_out: Whether the wait ended without any stable business output.
+        recovered_output_count: Number of stable output files found before the
+            timeout.
+
+    Returns:
+        Immutable wait summary for result evidence and status decisions.
+    """
+
+    task_ids: tuple[str, ...] = ()
+    waited_ms: int = 0
+    timed_out: bool = False
+    recovered_output_count: int = 0
 
 
 class BatchRunner:
@@ -112,6 +149,7 @@ class BatchRunner:
         batch_payload = {
             "batch_id": batch_id,
             "suite_id": manifest.suite_id,
+            "suite": _batch_suite_payload(manifest),
             "model": _batch_model_payload(model_request),
             "status": "passed" if case_counts["failed"] == 0 else "failed",
             "case_counts": case_counts,
@@ -165,6 +203,14 @@ class BatchRunner:
                 case_layout=case_layout,
                 session_file=runner_result.session_file,
             )
+            pending_background_tasks = _pending_background_tasks(
+                runner_result=runner_result,
+                case_layout=case_layout,
+            )
+            background_wait = _wait_for_background_outputs_if_needed(
+                output_dir=sandbox.output_dir,
+                pending_tasks=pending_background_tasks,
+            )
             copy_outputs_to_result(sandbox=sandbox, outputs_dir=case_layout.outputs_dir)
             cleanup_errors.extend(_cleanup_runtime_dirs(case_layout))
             result_payload = self._build_result_payload(
@@ -174,7 +220,12 @@ class BatchRunner:
                 runner_result=runner_result,
                 duration_ms=_elapsed_ms(case_started_perf),
                 model_request=model_request,
-                missing_evidence=[*session_missing, *([f"sandbox_cleanup_failed: {item}" for item in cleanup_errors])],
+                missing_evidence=[
+                    *session_missing,
+                    *_background_missing_evidence(background_wait),
+                    *([f"sandbox_cleanup_failed: {item}" for item in cleanup_errors]),
+                ],
+                background_wait=background_wait,
             )
         except Exception as exc:
             cleanup_errors.extend(_cleanup_runtime_dirs(case_layout))
@@ -201,6 +252,7 @@ class BatchRunner:
         duration_ms: int,
         model_request: RuntimeModelRequest,
         missing_evidence: list[str],
+        background_wait: BackgroundOutputWaitResult,
     ) -> dict[str, Any]:
         """Build the successful or runner-failed result payload.
 
@@ -212,19 +264,19 @@ class BatchRunner:
             duration_ms: Case duration in milliseconds.
             model_request: Model id and optional config passed to CodeBuddy.
             missing_evidence: Missing evidence labels.
+            background_wait: Background task wait summary collected before
+                copying business outputs.
 
         Returns:
             `result.json` payload.
         """
 
-        graders = self._run_graders(manifest=manifest, case_layout=case_layout)
-        status = "completed" if runner_result.exit_code == 0 else "failed"
-        score = 1 if status == "completed" and all(item["score"] == 1 for item in graders) else 0
-        return {
+        status = "completed" if runner_result.exit_code == 0 and not background_wait.timed_out else "failed"
+        payload: dict[str, Any] = {
             "case_id": case.case_id,
             "status": status,
-            "verdict": "pass" if score == 1 else "fail",
-            "score": score,
+            "verdict": "fail",
+            "score": 0,
             "final_response": runner_result.final_message,
             "model": _case_model_payload(model_request, observed_model=runner_result.model),
             "metrics": {
@@ -232,13 +284,26 @@ class BatchRunner:
                 "tokens": _normalize_tokens(runner_result.usage),
                 "cost": {"amount": None, "currency": None},
             },
-            "graders": graders,
+            "graders": [],
             "evidence": {
                 "session_path": "session.jsonl",
                 "outputs_path": "outputs/",
                 "missing": missing_evidence,
             },
         }
+        if background_wait.task_ids:
+            payload["evidence"]["background_tasks"] = _background_wait_evidence(background_wait)
+
+        # Some graders, especially ``case_max_duration``, read result.json.
+        # Write the pre-grader payload first so those graders can inspect the
+        # same duration and evidence that will be kept in the final result.
+        write_json(case_layout.result_json, payload)
+        graders = self._run_graders(manifest=manifest, case_layout=case_layout)
+        score = 1 if status == "completed" and all(item["score"] == 1 for item in graders) else 0
+        payload["graders"] = graders
+        payload["score"] = score
+        payload["verdict"] = "pass" if score == 1 else "fail"
+        return payload
 
     def _build_failed_result_payload(
         self,
@@ -343,6 +408,205 @@ class BatchRunner:
                 continue
             raise ValueError(f"unknown grader: {grader_id}")
         return results
+
+
+def _pending_background_tasks(
+    *,
+    runner_result: HeadlessRunResult,
+    case_layout: CaseArtifactLayout,
+) -> PendingBackgroundTasks:
+    """Return unfinished background tasks observed for one case.
+
+    Args:
+        runner_result: Raw CodeBuddy runner result.
+        case_layout: Case result paths, including copied ``session.jsonl``.
+
+    Returns:
+        Pending background task summary. The runner events are preferred, with
+        the copied session JSONL as a fallback for fake runners or partial
+        session recovery.
+    """
+
+    events = runner_result.session_events or _read_session_events(case_layout.session_jsonl)
+    return find_pending_background_tasks(events, final_message=runner_result.final_message)
+
+
+def _wait_for_background_outputs_if_needed(
+    *,
+    output_dir: Path,
+    pending_tasks: PendingBackgroundTasks,
+) -> BackgroundOutputWaitResult:
+    """Wait for stable business outputs when CodeBuddy returned too early.
+
+    Args:
+        output_dir: Sandbox ``output/`` directory.
+        pending_tasks: Background task summary from the session.
+
+    Returns:
+        BackgroundOutputWaitResult. No waiting occurs when no pending task is
+        present.
+    """
+
+    if not has_pending_background_tasks(pending_tasks):
+        return BackgroundOutputWaitResult()
+
+    started = time.perf_counter()
+    recovered_files = _stable_business_output_files(output_dir)
+    if recovered_files:
+        return BackgroundOutputWaitResult(
+            task_ids=pending_tasks.task_ids,
+            waited_ms=_elapsed_ms(started),
+            recovered_output_count=len(recovered_files),
+        )
+
+    wait_seconds = _background_output_wait_seconds()
+    deadline = time.perf_counter() + wait_seconds
+    while time.perf_counter() < deadline:
+        sleep_seconds = min(BACKGROUND_OUTPUT_POLL_SECONDS, max(deadline - time.perf_counter(), 0.0))
+        if sleep_seconds > 0:
+            time.sleep(sleep_seconds)
+        recovered_files = _stable_business_output_files(output_dir)
+        if recovered_files:
+            return BackgroundOutputWaitResult(
+                task_ids=pending_tasks.task_ids,
+                waited_ms=_elapsed_ms(started),
+                recovered_output_count=len(recovered_files),
+            )
+
+    return BackgroundOutputWaitResult(
+        task_ids=pending_tasks.task_ids,
+        waited_ms=_elapsed_ms(started),
+        timed_out=True,
+        recovered_output_count=0,
+    )
+
+
+def _stable_business_output_files(output_dir: Path) -> list[Path]:
+    """Return output files that are present and stable across a short probe.
+
+    Args:
+        output_dir: Sandbox ``output/`` directory.
+
+    Returns:
+        Stable business artifact files. Returns an empty list when no artifact
+        exists or when files are still changing.
+    """
+
+    first_snapshot = _business_output_snapshot(output_dir)
+    if not first_snapshot:
+        return []
+    time.sleep(BACKGROUND_OUTPUT_STABLE_SECONDS)
+    second_snapshot = _business_output_snapshot(output_dir)
+    if first_snapshot != second_snapshot:
+        return []
+    return [path for path in sorted(second_snapshot)]
+
+
+def _business_output_snapshot(output_dir: Path) -> dict[Path, tuple[int, int]]:
+    """Build a stable-comparison snapshot for business output files.
+
+    Args:
+        output_dir: Sandbox ``output/`` directory.
+
+    Returns:
+        Mapping of file path to ``(size_bytes, mtime_ns)``.
+    """
+
+    if not output_dir.exists():
+        return {}
+
+    snapshot: dict[Path, tuple[int, int]] = {}
+    for path in sorted(output_dir.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in BUSINESS_OUTPUT_SUFFIXES:
+            continue
+        try:
+            stat_result = path.stat()
+        except OSError:
+            continue
+        if stat_result.st_size <= 0:
+            continue
+        snapshot[path] = (stat_result.st_size, stat_result.st_mtime_ns)
+    return snapshot
+
+
+def _background_output_wait_seconds() -> int:
+    """Return the configured wait budget for unfinished background tasks.
+
+    Args:
+        None.
+
+    Returns:
+        Non-negative wait duration in seconds. The default keeps normal evals
+        fast while giving long preview tasks a chance to finish writing output.
+    """
+
+    raw_value = os.getenv(BACKGROUND_OUTPUT_WAIT_SECONDS_ENV)
+    if raw_value is None:
+        return DEFAULT_BACKGROUND_OUTPUT_WAIT_SECONDS
+    try:
+        return max(int(raw_value), 0)
+    except ValueError:
+        return DEFAULT_BACKGROUND_OUTPUT_WAIT_SECONDS
+
+
+def _background_missing_evidence(background_wait: BackgroundOutputWaitResult) -> list[str]:
+    """Build missing-evidence labels for background task timeouts.
+
+    Args:
+        background_wait: Background output wait summary.
+
+    Returns:
+        Evidence labels to append to ``result.json.evidence.missing``.
+    """
+
+    if not background_wait.timed_out:
+        return []
+    task_ids = ", ".join(background_wait.task_ids)
+    waited_s = round(background_wait.waited_ms / 1000, 1)
+    return [f"background_task_timeout: task_ids={task_ids}; waited_s={waited_s}"]
+
+
+def _background_wait_evidence(background_wait: BackgroundOutputWaitResult) -> dict[str, Any]:
+    """Build structured result evidence for a background output wait.
+
+    Args:
+        background_wait: Background output wait summary.
+
+    Returns:
+        JSON-ready evidence dictionary.
+    """
+
+    return {
+        "task_ids": list(background_wait.task_ids),
+        "waited_ms": background_wait.waited_ms,
+        "timed_out": background_wait.timed_out,
+        "recovered_output_count": background_wait.recovered_output_count,
+    }
+
+
+def _read_session_events(session_jsonl: Path) -> list[dict[str, Any]]:
+    """Read raw session events from a copied ``session.jsonl`` file.
+
+    Args:
+        session_jsonl: Public case session JSONL path.
+
+    Returns:
+        Parsed event dictionaries. Malformed lines are skipped.
+    """
+
+    if not session_jsonl.exists():
+        return []
+    events: list[dict[str, Any]] = []
+    for line in session_jsonl.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict):
+            events.append(event)
+    return events
 
 
 def _default_codebuddy_env(
@@ -629,6 +893,43 @@ def _batch_model_payload(model_request: RuntimeModelRequest) -> dict[str, Any]:
     if config_payload is not None:
         payload["config"] = config_payload
     return payload
+
+
+def _batch_suite_payload(manifest: EvalSuiteManifest) -> dict[str, Any]:
+    """Build suite traceability evidence for ``batch.json``.
+
+    Args:
+        manifest: Loaded suite manifest.
+
+    Returns:
+        JSON-ready suite evidence with the actual grader list and, when
+        available, the source manifest path and content fingerprint.
+    """
+
+    payload: dict[str, Any] = {"graders": list(manifest.graders)}
+    if manifest.source_path is not None:
+        payload["source_path"] = str(manifest.source_path)
+        fingerprint = _file_fingerprint(manifest.source_path)
+        if fingerprint:
+            payload["fingerprint"] = fingerprint
+    return payload
+
+
+def _file_fingerprint(path: Path) -> str | None:
+    """Return a short SHA-256 fingerprint for a readable file.
+
+    Args:
+        path: File to fingerprint.
+
+    Returns:
+        ``sha256:<16 hex chars>`` when the file can be read; otherwise None.
+    """
+
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    return f"sha256:{hashlib.sha256(data).hexdigest()[:16]}"
 
 
 def _case_model_payload(model_request: RuntimeModelRequest, *, observed_model: str | None) -> dict[str, Any]:

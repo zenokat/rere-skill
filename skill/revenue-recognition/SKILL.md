@@ -47,6 +47,7 @@ description: 当需要处理收入确认、收入确认汇总、试算预览、�
 - 不要在命令中添加 `| tail`、`| head` 等 pipe 命令——这会缓冲输出导致无法看到实时进度。
 - 脚本会向 stderr 输出 `[validate]`、`[preview]` 前缀的进度标记。如果超过 2 分钟没有 stdout 输出，用 `2>&1` 合并 stderr 查看进度。
 - 如果脚本超过 5 分钟无任何输出，再判定为异常并停止。
+- 如果运行环境把命令移入后台，并提示 `Status: running` 或等待 `<task-notification>`，不要把“仍在进行中”作为最终交付结果。必须等到任务返回 `completed`、看到 `Preview complete` 且确认 `output/` 下已有产物后，再总结结果；若达到环境超时上限仍未完成，明确报告为运行超时。
 
 ## 可用脚本
 
