@@ -1,4 +1,5 @@
 suite_id: Rollup_Core_20260630
+note: "模拟用户请求所提供信息完善、源文件完备的理想情况，考察Agent在14个确认项目上的表现"
 model:
   id: deepseek-v4-pro
   config_file: ${EVAL_MODELS_JSON}

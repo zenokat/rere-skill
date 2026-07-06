@@ -101,7 +101,7 @@ def _resolve_suite_payload(payload: dict[str, Any], suite_path: Path) -> dict[st
         ManifestLoadError: If unsupported fields or invalid case folders exist.
     """
 
-    allowed_keys = {"suite_id", "graders", "cases", "input", "skills", "model"}
+    allowed_keys = {"suite_id", "note", "graders", "cases", "input", "skills", "model"}
     extra_keys = sorted(set(payload) - allowed_keys)
     if extra_keys:
         raise ManifestLoadError(f"unsupported suite field(s): {', '.join(extra_keys)}")
