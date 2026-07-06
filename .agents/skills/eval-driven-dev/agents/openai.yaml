@@ -1,0 +1,4 @@
+interface:
+  display_name: "Eval Driven Dev"
+  short_description: "Run eval, analyze badcases, iterate, rerun, and commit the loop."
+  default_prompt: "Use $eval-driven-dev to run an eval-driven iteration loop for the target suite."
