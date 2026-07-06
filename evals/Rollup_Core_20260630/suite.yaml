@@ -1,0 +1,21 @@
+suite_id: Rollup_Core_20260630
+graders:
+  - preview_file_exists
+  - preview_matches_baseline
+input: d:/AI/rere-agent/202605-source-excel
+skills: d:/AI/rere-agent/skill/revenue-recognition
+cases:
+  - dine_in_revenue_202605
+  - eleme_delivery_revenue_202605
+  - eleme_delivery_settlement_202605
+  - member_collection_202605
+  - wechat_pay_settlement_202605
+  - alipay_settlement_202605
+  - shouqianba_settlement_202605
+  - douyin_voucher_settlement_202605
+  - jingdong_delivery_revenue_202605
+  - jingdong_delivery_settlement_202605
+  - amap_voucher_settlement_202605
+  - meituan_voucher_settlement_202605
+  - meituan_delivery_revenue_202605
+  - meituan_delivery_settlement_202605
