@@ -158,7 +158,12 @@ def run(
         elif mode is RunMode.PREVIEW:
             _require_option(period, "--period", mode)
             _require_option(source_file, "--source_file", mode)
-            response = service.run_preview(recog_id=recog_id or "", period=period or "", source_file=source_file or Path())
+            response = service.run_preview(
+                recog_id=recog_id or "",
+                period=period or "",
+                source_file=source_file or Path(),
+                result_file=result_file,
+            )
         else:
             _require_option(result_file, "--result_file", mode)
             response = service.run_upload(

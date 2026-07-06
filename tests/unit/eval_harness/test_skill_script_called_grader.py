@@ -93,6 +93,32 @@ def test_passes_when_script_called_with_flags(tmp_path: Path) -> None:
     assert result["evidence"]["match_count"] == 1
 
 
+def test_passes_when_agent_cd_into_scripts_before_running_script(tmp_path: Path) -> None:
+    """Score 1 when the agent runs the script after changing into scripts/."""
+
+    session = _write_session(tmp_path, [
+        _bash_event(
+            'cd "/workspace/.workbuddy/skills/revenue-recognition/scripts" && uv run list_recog_items.py'
+        ),
+    ])
+    result = grade_skill_script_called(session_jsonl=session, script_name="list_recog_items")
+
+    assert result["score"] == 1
+    assert result["evidence"]["match_count"] == 1
+
+
+def test_passes_when_windows_style_script_path_is_used(tmp_path: Path) -> None:
+    """Score 1 when a Windows-style path points at scripts/<name>.py."""
+
+    session = _write_session(tmp_path, [
+        _bash_event(r'python ".workbuddy\skills\revenue-recognition\scripts\run_recog_rollup.py" --preview'),
+    ])
+    result = grade_skill_script_called(session_jsonl=session, script_name="run_recog_rollup")
+
+    assert result["score"] == 1
+    assert result["evidence"]["match_count"] == 1
+
+
 def test_fails_when_no_matching_command(tmp_path: Path) -> None:
     """Score 0 when no Bash command references the target script."""
 
@@ -105,6 +131,19 @@ def test_fails_when_no_matching_command(tmp_path: Path) -> None:
     assert result["score"] == 0
     assert result["evidence"]["match_count"] == 0
     assert result["evidence"]["bash_command_count"] == 2
+
+
+def test_fails_when_script_name_only_appears_as_argument(tmp_path: Path) -> None:
+    """Mentioning a script file as data should not count as executing it."""
+
+    session = _write_session(tmp_path, [
+        _bash_event("echo scripts/list_recog_items.py"),
+        _bash_event('grep -R "run_recog_rollup.py" .workbuddy/skills/revenue-recognition'),
+    ])
+    result = grade_skill_script_called(session_jsonl=session, script_name="list_recog_items")
+
+    assert result["score"] == 0
+    assert result["evidence"]["match_count"] == 0
 
 
 def test_fails_when_session_missing(tmp_path: Path) -> None:

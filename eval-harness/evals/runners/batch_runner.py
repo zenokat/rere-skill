@@ -364,6 +364,7 @@ def _default_codebuddy_env(
         # less likely to write session JSONL using the host code page.
         "PYTHONUTF8": "1",
         "CODEBUDDY_CONFIG_DIR": str(codebuddy_config_dir),
+        "RERE_OUTPUT_ROOT": str(case_layout.sandbox_dir / "output"),
         "HTTP_PROXY": "",
         "HTTPS_PROXY": "",
         "http_proxy": "",
@@ -375,7 +376,8 @@ def _default_codebuddy_env(
     }
     if model_request and model_request.config_file:
         env["CODEBUDDY_DISABLE_BUILTIN_MODELS"] = "1"
-    env.update(_load_feishu_credentials())
+    for key, value in _load_feishu_credentials().items():
+        env.setdefault(key, value)
     return env
 
 

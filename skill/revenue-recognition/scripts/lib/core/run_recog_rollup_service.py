@@ -33,7 +33,14 @@ class ValidationStage(Protocol):
 class PreviewStage(Protocol):
     """试算阶段协议。"""
 
-    def run(self, recog_id: str, period: str, source_file: Path) -> PreviewSuccessResponse:
+    def run(
+        self,
+        recog_id: str,
+        period: str,
+        source_file: Path,
+        *,
+        result_file: Path | None = None,
+    ) -> PreviewSuccessResponse:
         """执行试算。"""
 
 
@@ -103,11 +110,23 @@ class RunRecogRollupService:
         self._require_target_table(project)
         return self._validation_stage.run(recog_id=recog_id, source_file=source_file, project=project)
 
-    def run_preview(self, recog_id: str, period: str, source_file: Path) -> PreviewSuccessResponse:
+    def run_preview(
+        self,
+        recog_id: str,
+        period: str,
+        source_file: Path,
+        *,
+        result_file: Path | None = None,
+    ) -> PreviewSuccessResponse:
         """只执行试算。"""
 
         self._require_project(recog_id)
-        return self._preview_stage.run(recog_id=recog_id, period=period, source_file=source_file)
+        return self._preview_stage.run(
+            recog_id=recog_id,
+            period=period,
+            source_file=source_file,
+            result_file=result_file,
+        )
 
     def run_upload(self, recog_id: str, result_file: Path, strategy: UploadStrategy) -> UploadSuccessResponse:
         """只执行上传。"""
@@ -154,4 +173,3 @@ class RunRecogRollupService:
                 ],
             ),
         )
-

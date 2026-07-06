@@ -27,12 +27,20 @@ class PreviewArtifactWriter:
         period: str,
         records: list[dict[str, Any]],
         group_fields: list[str],
+        result_file: Path | None = None,
     ) -> PreviewArtifact:
         """把试算结果写入 Excel 文件。"""
 
         ensure_output_root(self._output_root)
         generated_at = datetime.now()
-        result_file = build_preview_output_path(period=period, recog_id=recog_id, output_root=self._output_root, generated_at=generated_at)
+        if result_file is None:
+            result_file = build_preview_output_path(
+                period=period,
+                recog_id=recog_id,
+                output_root=self._output_root,
+                generated_at=generated_at,
+            )
+        result_file.parent.mkdir(parents=True, exist_ok=True)
 
         workbook = Workbook()
         results_sheet = workbook.active

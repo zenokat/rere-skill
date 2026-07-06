@@ -76,6 +76,23 @@ def test_passes_when_any_invocation_has_target_arg(tmp_path: Path) -> None:
     assert result["evidence"]["match_count"] == 1
 
 
+def test_passes_when_agent_cd_into_scripts_before_running_script_with_arg(tmp_path: Path) -> None:
+    """Score 1 when a cd-then-run command carries the expected argument."""
+
+    session = _write_session(tmp_path, [
+        _bash_event(
+            'cd "/workspace/.workbuddy/skills/revenue-recognition/scripts" '
+            "&& uv run run_recog_rollup.py --preview --recog_id foo"
+        ),
+    ])
+    result = grade_skill_script_args(
+        session_jsonl=session, script_name="run_recog_rollup", arg_pattern="--preview",
+    )
+
+    assert result["score"] == 1
+    assert result["evidence"]["match_count"] == 1
+
+
 def test_fails_when_script_called_without_target_arg(tmp_path: Path) -> None:
     """Score 0 when the script is called but without the expected flag."""
 

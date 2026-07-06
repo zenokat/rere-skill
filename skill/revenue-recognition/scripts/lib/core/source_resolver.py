@@ -21,6 +21,7 @@ SUPPORTED_SOURCE_SUFFIXES = {".csv", ".xlsx", ".xlsm"}
 STREAMING_WORKBOOK_SIZE_THRESHOLD = 10 * 1024 * 1024
 DataRow = dict[tuple[str, str], Any]
 DataRowIteratorFactory = Callable[[], Iterator[tuple[int, DataRow]]]
+ProgressCallback = Callable[[int], None]
 TEMPORARY_SOURCE_PREFIXES = ("~$",)
 FILE_NAME_VIRTUAL_FIELD = "FILE_NAME"
 SUPPORTED_CSV_ENCODINGS = ("utf-8-sig", "gb18030")
@@ -221,13 +222,49 @@ def build_sheet_dataset(
     *,
     load_cache: SourceFileLoadCache | None = None,
     stream_to_end: bool = False,
+    progress_callback: ProgressCallback | None = None,
 ) -> SheetDataset:
     """按源结构定义读取并解析单个逻辑 sheet。"""
 
     if _should_stream_sheet_dataset(source_file=source_file, spec=spec):
         if stream_to_end and spec.last_row == -1:
-            return _build_streaming_sheet_dataset_to_end(source_file=source_file, spec=spec)
-        return _build_streaming_sheet_dataset(source_file=source_file, spec=spec)
+            return _build_streaming_sheet_dataset_to_end(
+                source_file=source_file,
+                spec=spec,
+                load_cache=load_cache,
+                progress_callback=progress_callback,
+            )
+        return _build_streaming_sheet_dataset(
+            source_file=source_file,
+            spec=spec,
+            load_cache=load_cache,
+            progress_callback=progress_callback,
+        )
+
+    return _build_in_memory_sheet_dataset(
+        source_file=source_file,
+        spec=spec,
+        load_cache=load_cache,
+    )
+
+
+def _build_in_memory_sheet_dataset(
+    source_file: Path,
+    spec: SourceSheetSpec,
+    *,
+    load_cache: SourceFileLoadCache | None,
+) -> SheetDataset:
+    """Build a sheet dataset by loading the needed workbook rows into memory.
+
+    Args:
+        source_file: CSV or workbook file to parse.
+        spec: Source sheet structure from the rule bundle.
+        load_cache: Optional per-run cache used to avoid reopening the same
+            workbook repeatedly.
+
+    Returns:
+        Parsed sheet dataset with data rows materialized in memory.
+    """
 
     raw_rows, physical_sheet = _load_raw_rows(
         source_file=source_file,
@@ -285,19 +322,24 @@ def _should_stream_sheet_dataset(source_file: Path, spec: SourceSheetSpec) -> bo
 
     if source_file.suffix.lower() not in {".xlsx", ".xlsm"}:
         return False
-    if spec.category_row is not None:
-        return False
     try:
         return source_file.stat().st_size >= STREAMING_WORKBOOK_SIZE_THRESHOLD
     except OSError:
         return False
 
 
-def _build_streaming_sheet_dataset(source_file: Path, spec: SourceSheetSpec) -> SheetDataset:
+def _build_streaming_sheet_dataset(
+    source_file: Path,
+    spec: SourceSheetSpec,
+    *,
+    load_cache: SourceFileLoadCache | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> SheetDataset:
     """为超大工作簿构建轻量级数据集描述。"""
 
     from openpyxl import load_workbook
 
+    should_fallback_to_memory = False
     workbook = load_workbook(source_file, read_only=True, data_only=True, keep_links=False)
     try:
         worksheet, physical_sheet = _resolve_workbook_worksheet(workbook=workbook, logical_sheet=spec.sheet)
@@ -322,19 +364,30 @@ def _build_streaming_sheet_dataset(source_file: Path, spec: SourceSheetSpec) -> 
             list(row)
             for row in worksheet.iter_rows(min_row=1, max_row=header_anchor_row, values_only=True)
         ]
-        columns, duplicate_columns = _build_column_descriptors(raw_rows=header_rows, spec=spec)
+        if _streaming_header_may_need_merged_cell_expansion(raw_rows=header_rows, spec=spec):
+            should_fallback_to_memory = True
+        else:
+            columns, duplicate_columns = _build_column_descriptors(raw_rows=header_rows, spec=spec)
 
-        first_raw_row = next(
-            worksheet.iter_rows(min_row=data_start_row, max_row=data_start_row, values_only=True),
-            None,
-        )
-        first_data_row = (
-            _build_row_value_map(row_values=first_raw_row, columns=columns, source_file=source_file)
-            if first_raw_row is not None
-            else None
-        )
+            first_raw_row = next(
+                worksheet.iter_rows(
+                    min_row=data_start_row,
+                    max_row=data_start_row,
+                    max_col=_max_physical_column_index(columns),
+                    values_only=True,
+                ),
+                None,
+            )
+            first_data_row = (
+                _build_row_value_map(row_values=first_raw_row, columns=columns, source_file=source_file)
+                if first_raw_row is not None
+                else None
+            )
     finally:
         workbook.close()
+
+    if should_fallback_to_memory:
+        return _build_in_memory_sheet_dataset(source_file=source_file, spec=spec, load_cache=load_cache)
 
     return SheetDataset(
         source_file=source_file,
@@ -354,15 +407,23 @@ def _build_streaming_sheet_dataset(source_file: Path, spec: SourceSheetSpec) -> 
             columns=columns,
             data_start_row=data_start_row,
             resolved_last_row=resolved_last_row,
+            progress_callback=progress_callback,
         ),
     )
 
 
-def _build_streaming_sheet_dataset_to_end(source_file: Path, spec: SourceSheetSpec) -> SheetDataset:
+def _build_streaming_sheet_dataset_to_end(
+    source_file: Path,
+    spec: SourceSheetSpec,
+    *,
+    load_cache: SourceFileLoadCache | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> SheetDataset:
     """为 `last_row=-1` 的超大工作簿构建真正流式的数据集。"""
 
     from openpyxl import load_workbook
 
+    should_fallback_to_memory = False
     workbook = load_workbook(source_file, read_only=True, data_only=True, keep_links=False)
     try:
         worksheet, physical_sheet = _resolve_workbook_worksheet(workbook=workbook, logical_sheet=spec.sheet)
@@ -384,19 +445,29 @@ def _build_streaming_sheet_dataset_to_end(source_file: Path, spec: SourceSheetSp
         if spec.category_row is not None and len(header_rows) < spec.category_row:
             raise ValueError("category_row exceeds the actual file row count.")
 
-        columns, duplicate_columns = _build_column_descriptors(raw_rows=header_rows, spec=spec)
-        first_raw_row = next(
-            worksheet.iter_rows(min_row=data_start_row, values_only=True),
-            None,
-        )
-        if first_raw_row is None:
-            first_data_row = None
-            first_data_row_number = None
+        if _streaming_header_may_need_merged_cell_expansion(raw_rows=header_rows, spec=spec):
+            should_fallback_to_memory = True
         else:
-            first_data_row = _build_row_value_map(row_values=first_raw_row, columns=columns, source_file=source_file)
-            first_data_row_number = data_start_row
+            columns, duplicate_columns = _build_column_descriptors(raw_rows=header_rows, spec=spec)
+            first_raw_row = next(
+                worksheet.iter_rows(
+                    min_row=data_start_row,
+                    max_col=_max_physical_column_index(columns),
+                    values_only=True,
+                ),
+                None,
+            )
+            if first_raw_row is None:
+                first_data_row = None
+                first_data_row_number = None
+            else:
+                first_data_row = _build_row_value_map(row_values=first_raw_row, columns=columns, source_file=source_file)
+                first_data_row_number = data_start_row
     finally:
         workbook.close()
+
+    if should_fallback_to_memory:
+        return _build_in_memory_sheet_dataset(source_file=source_file, spec=spec, load_cache=load_cache)
 
     return SheetDataset(
         source_file=source_file,
@@ -415,6 +486,7 @@ def _build_streaming_sheet_dataset_to_end(source_file: Path, spec: SourceSheetSp
             logical_sheet=spec.sheet,
             columns=columns,
             data_start_row=data_start_row,
+            progress_callback=progress_callback,
         ),
     )
 
@@ -662,6 +734,7 @@ def _iter_workbook_sheet_rows(
     columns: list[ColumnDescriptor],
     data_start_row: int,
     resolved_last_row: int,
+    progress_callback: ProgressCallback | None = None,
 ) -> Iterator[tuple[int, DataRow]]:
     """流式遍历单个工作簿 sheet 的数据行。"""
 
@@ -672,12 +745,19 @@ def _iter_workbook_sheet_rows(
         worksheet, _ = _resolve_workbook_worksheet(workbook=workbook, logical_sheet=logical_sheet)
         _prepare_read_only_worksheet(worksheet, force_calculate=True)
         for row_number, row_values in enumerate(
-            worksheet.iter_rows(min_row=data_start_row, max_row=resolved_last_row, values_only=True),
+            worksheet.iter_rows(
+                min_row=data_start_row,
+                max_row=resolved_last_row,
+                max_col=_max_physical_column_index(columns),
+                values_only=True,
+            ),
             start=data_start_row,
         ):
             mapped_row = _build_row_value_map(row_values=row_values, columns=columns, source_file=source_file)
             if _is_effectively_blank_data_row(mapped_row):
                 continue
+            if progress_callback is not None:
+                progress_callback(row_number)
             yield row_number, mapped_row
     finally:
         workbook.close()
@@ -689,6 +769,7 @@ def _iter_workbook_sheet_rows_to_end(
     logical_sheet: str,
     columns: list[ColumnDescriptor],
     data_start_row: int,
+    progress_callback: ProgressCallback | None = None,
 ) -> Iterator[tuple[int, DataRow]]:
     """流式遍历 worksheet 到物理文件末尾。"""
 
@@ -699,12 +780,18 @@ def _iter_workbook_sheet_rows_to_end(
         worksheet, _ = _resolve_workbook_worksheet(workbook=workbook, logical_sheet=logical_sheet)
         _prepare_read_only_worksheet(worksheet, force_calculate=False)
         for row_number, row_values in enumerate(
-            worksheet.iter_rows(min_row=data_start_row, values_only=True),
+            worksheet.iter_rows(
+                min_row=data_start_row,
+                max_col=_max_physical_column_index(columns),
+                values_only=True,
+            ),
             start=data_start_row,
         ):
             mapped_row = _build_row_value_map(row_values=row_values, columns=columns, source_file=source_file)
             if _is_effectively_blank_data_row(mapped_row):
                 continue
+            if progress_callback is not None:
+                progress_callback(row_number)
             yield row_number, mapped_row
     finally:
         workbook.close()
@@ -717,6 +804,55 @@ def _prepare_read_only_worksheet(worksheet, *, force_calculate: bool) -> None:
         worksheet.reset_dimensions()
         if force_calculate and hasattr(worksheet, "calculate_dimension"):
             worksheet.calculate_dimension(force=True)
+
+
+def _max_physical_column_index(columns: list[ColumnDescriptor]) -> int | None:
+    """Return the rightmost physical source column required by rules.
+
+    Args:
+        columns: Resolved source columns, including virtual columns such as
+            ``FILE_NAME`` whose ``column_index`` is negative.
+
+    Returns:
+        1-based maximum column index for ``openpyxl.iter_rows(max_col=...)``.
+        Returns None when there are no physical columns.
+    """
+
+    physical_indices = [column.column_index for column in columns if column.column_index >= 0]
+    if not physical_indices:
+        return None
+    return max(physical_indices) + 1
+
+
+def _streaming_header_may_need_merged_cell_expansion(
+    *,
+    raw_rows: list[list[Any]],
+    spec: SourceSheetSpec,
+) -> bool:
+    """Return whether streaming header parsing may lose merged-cell categories.
+
+    Args:
+        raw_rows: Header rows read from a read-only worksheet.
+        spec: Source sheet structure from the rule bundle.
+
+    Returns:
+        True when a two-row header has a field value but no category value in
+        the configured category row. In read-only mode openpyxl does not expose
+        merged-cell ranges, so this shape may mean the category value should
+        have been expanded from a merged cell by the in-memory parser.
+    """
+
+    if spec.category_row is None:
+        return False
+    category_row_index = spec.category_row - 1
+    field_row_index = spec.field_row - 1
+    max_columns = max((len(row) for row in raw_rows), default=0)
+    for column_index in range(max_columns):
+        field_value = _normalize_cell_value(_get_cell(raw_rows, field_row_index, column_index))
+        category_value = _normalize_cell_value(_get_cell(raw_rows, category_row_index, column_index))
+        if field_value and category_value is None:
+            return True
+    return False
 
 
 def _resolve_column_header(

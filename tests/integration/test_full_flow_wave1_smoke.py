@@ -31,9 +31,16 @@ class _RecordingValidationStage:
     def __init__(self) -> None:
         self.calls: list[tuple[str, Path]] = []
 
-    def run(self, recog_id: str, source_file: Path) -> ValidateSuccessResponse:
+    def run(
+        self,
+        recog_id: str,
+        source_file: Path,
+        *,
+        project: RecognitionProject | None = None,
+    ) -> ValidateSuccessResponse:
         """模拟 validate 成功。"""
 
+        assert project is not None
         self.calls.append((recog_id, source_file))
         return ValidateSuccessResponse(recog_id=recog_id, sampled_source_file=str(source_file), checks=[], error_count=0)
 
@@ -45,9 +52,17 @@ class _RecordingPreviewStage:
         self.calls: list[tuple[str, str, Path]] = []
         self._result_file = result_file
 
-    def run(self, recog_id: str, period: str, source_file: Path) -> PreviewSuccessResponse:
+    def run(
+        self,
+        recog_id: str,
+        period: str,
+        source_file: Path,
+        *,
+        result_file: Path | None = None,
+    ) -> PreviewSuccessResponse:
         """模拟 preview 成功。"""
 
+        assert result_file is None
         self.calls.append((recog_id, period, source_file))
         return PreviewSuccessResponse(
             recog_id=recog_id,

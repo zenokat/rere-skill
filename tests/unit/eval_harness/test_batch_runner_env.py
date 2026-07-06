@@ -33,6 +33,7 @@ def test_default_codebuddy_env_isolated_and_proxy_clean(tmp_path):
     env = _default_codebuddy_env(case_layout=case_layout)
 
     assert env["CODEBUDDY_CONFIG_DIR"] == str(case_layout.codebuddy_config_dir)
+    assert env["RERE_OUTPUT_ROOT"] == str(case_layout.sandbox_dir / "output")
     assert case_layout.codebuddy_config_dir.exists()
     assert env["HTTP_PROXY"] == ""
     assert env["HTTPS_PROXY"] == ""

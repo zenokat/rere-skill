@@ -241,6 +241,137 @@ def test_streaming_sheet_dataset_allows_header_only_excel_when_last_row_is_to_en
     assert list(dataset.iter_data_rows()) == []
 
 
+def test_streaming_sheet_dataset_supports_category_header_rows() -> None:
+    """Large Excel streaming should support two-row category and field headers."""
+
+    tmp_dir = _make_tmp_dir()
+    source_file = tmp_dir / "category-header.xlsx"
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Summary"
+    worksheet.append(["store", "settlement", "settlement"])
+    worksheet.append(["name", "amount", "fee"])
+    worksheet.append(["Shop A", "12.50", "-0.30"])
+    workbook.save(source_file)
+    workbook.close()
+
+    original_threshold = source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD
+    source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = 0
+    try:
+        dataset = source_resolver.build_sheet_dataset(
+            source_file,
+            SourceSheetSpec(recog_id="demo", sheet="Summary", category_row=1, field_row=2, last_row=-1),
+            stream_to_end=True,
+        )
+        rows = list(dataset.iter_data_rows())
+    finally:
+        source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = original_threshold
+
+    assert rows[0][0] == 3
+    assert rows[0][1][("store", "name")] == "Shop A"
+    assert rows[0][1][("settlement", "amount")] == "12.50"
+    assert rows[0][1][("settlement", "fee")] == "-0.30"
+
+
+def test_streaming_sheet_dataset_falls_back_for_merged_category_headers() -> None:
+    """Streaming should not lose categories that depend on merged Excel cells."""
+
+    tmp_dir = _make_tmp_dir()
+    source_file = tmp_dir / "merged-category-header.xlsx"
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Summary"
+    worksheet["A1"] = "settlement"
+    worksheet.merge_cells("A1:B1")
+    worksheet.append(["amount", "fee"])
+    worksheet.append(["12.50", "-0.30"])
+    workbook.save(source_file)
+    workbook.close()
+
+    original_threshold = source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD
+    source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = 0
+    try:
+        dataset = source_resolver.build_sheet_dataset(
+            source_file,
+            SourceSheetSpec(recog_id="demo", sheet="Summary", category_row=1, field_row=2, last_row=-1),
+            stream_to_end=True,
+        )
+    finally:
+        source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = original_threshold
+
+    assert dataset.row_iterator_factory is None
+    assert dataset.data_rows[0][("settlement", "amount")] == "12.50"
+    assert dataset.data_rows[0][("settlement", "fee")] == "-0.30"
+
+
+def test_streaming_sheet_dataset_reports_progress_for_rows() -> None:
+    """Streaming row iteration should report physical row numbers for progress logs."""
+
+    tmp_dir = _make_tmp_dir()
+    source_file = tmp_dir / "progress.xlsx"
+    reported_rows: list[int] = []
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Rows"
+    worksheet.append(["name", "amount"])
+    worksheet.append(["Shop A", "12.50"])
+    worksheet.append(["Shop B", "18.00"])
+    workbook.save(source_file)
+    workbook.close()
+
+    original_threshold = source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD
+    source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = 0
+    try:
+        dataset = source_resolver.build_sheet_dataset(
+            source_file,
+            SourceSheetSpec(recog_id="demo", sheet="Rows", field_row=1, last_row=-1),
+            stream_to_end=True,
+            progress_callback=reported_rows.append,
+        )
+        rows = list(dataset.iter_data_rows())
+    finally:
+        source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = original_threshold
+
+    assert [row_number for row_number, _ in rows] == [2, 3]
+    assert reported_rows == [2, 3]
+
+
+def test_streaming_sheet_dataset_reports_progress_for_fixed_last_row() -> None:
+    """Streaming with an explicit last row should use the same progress callback."""
+
+    tmp_dir = _make_tmp_dir()
+    source_file = tmp_dir / "fixed-range-progress.xlsx"
+    reported_rows: list[int] = []
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Rows"
+    worksheet.append(["name", "amount"])
+    worksheet.append(["Shop A", "12.50"])
+    worksheet.append(["Shop B", "18.00"])
+    worksheet.append(["Ignored", "99.00"])
+    workbook.save(source_file)
+    workbook.close()
+
+    original_threshold = source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD
+    source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = 0
+    try:
+        dataset = source_resolver.build_sheet_dataset(
+            source_file,
+            SourceSheetSpec(recog_id="demo", sheet="Rows", field_row=1, last_row=3),
+            progress_callback=reported_rows.append,
+        )
+        rows = list(dataset.iter_data_rows())
+    finally:
+        source_resolver.STREAMING_WORKBOOK_SIZE_THRESHOLD = original_threshold
+
+    assert [row_number for row_number, _ in rows] == [2, 3]
+    assert reported_rows == [2, 3]
+
+
 def test_prepare_read_only_worksheet_resets_stale_dimensions_even_when_max_row_is_not_one() -> None:
     """只读 worksheet 即使暴露出的 max_row 不是 1，也应主动重算失真的 dimension。"""
 

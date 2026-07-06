@@ -16,11 +16,13 @@ Usage in ``suite.yaml``::
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 MAX_SAMPLE_COMMANDS = 3
 MAX_COMMAND_LENGTH = 200
+COMMAND_START_OR_SEPARATOR = r"(?:^|(?:&&|\|\||[;&|])\s*)"
 
 
 def grade_skill_script_called(*, session_jsonl: Path, script_name: str) -> dict[str, Any]:
@@ -127,7 +129,7 @@ def _extract_bash_commands(session_jsonl: Path) -> list[str]:
 
 
 def _find_script_calls(commands: list[str], script_name: str) -> list[str]:
-    """Filter commands that contain ``scripts/<script_name>.py``.
+    """Filter commands that invoke the target skill script.
 
     Args:
         commands: Full list of Bash command strings.
@@ -137,8 +139,93 @@ def _find_script_calls(commands: list[str], script_name: str) -> list[str]:
         Commands that match the pattern.
     """
 
-    pattern = f"scripts/{script_name}.py"
-    return [cmd for cmd in commands if pattern in cmd]
+    return [cmd for cmd in commands if _command_invokes_script(cmd, script_name)]
+
+
+def _command_invokes_script(command: str, script_name: str) -> bool:
+    """Return whether a Bash command runs the target script.
+
+    Args:
+        command: Raw Bash command captured from ``session.jsonl``.
+        script_name: Script file name without prefix/suffix.
+
+    Returns:
+        True when the command uses either ``scripts/<script>.py`` or first
+        changes into a ``scripts`` directory and then invokes ``<script>.py``.
+    """
+
+    normalized_command = command.replace("\\", "/")
+    if _matches_script_path_invocation(normalized_command, script_name):
+        return True
+    return _changes_to_scripts_directory(normalized_command) and _matches_bare_script_invocation(
+        normalized_command,
+        script_name,
+    )
+
+
+def _matches_script_path_invocation(command: str, script_name: str) -> bool:
+    """Match invocations that include a ``scripts/<script>.py`` path.
+
+    Args:
+        command: Slash-normalized command string.
+        script_name: Script file name without prefix/suffix.
+
+    Returns:
+        True when the target script path appears in an executable position.
+    """
+
+    script_file = re.escape(f"{script_name}.py")
+    pattern = re.compile(
+        rf"{COMMAND_START_OR_SEPARATOR}"
+        rf"(?:uv\s+run\s+|python(?:\d(?:\.\d+)?)?\s+|py\s+)?"
+        rf"[\"']?(?:\./)?(?:[^\s\"';&|]+/)*scripts/{script_file}[\"']?"
+        rf"(?=$|[\s;&|])",
+        re.IGNORECASE,
+    )
+    return bool(pattern.search(command))
+
+
+def _changes_to_scripts_directory(command: str) -> bool:
+    """Return whether the command moves into a directory named ``scripts``.
+
+    Args:
+        command: Slash-normalized command string.
+
+    Returns:
+        True when the command contains a ``cd`` or ``pushd`` step whose target
+        path ends in ``scripts``.
+    """
+
+    pattern = re.compile(
+        rf"{COMMAND_START_OR_SEPARATOR}"
+        rf"(?:cd|pushd)\s+[\"']?(?:[^\s\"';&|]+/)*scripts[\"']?"
+        rf"(?=$|[\s;&|])",
+        re.IGNORECASE,
+    )
+    return bool(pattern.search(command))
+
+
+def _matches_bare_script_invocation(command: str, script_name: str) -> bool:
+    """Match ``<script>.py`` calls after the shell is already in ``scripts``.
+
+    Args:
+        command: Slash-normalized command string.
+        script_name: Script file name without prefix/suffix.
+
+    Returns:
+        True when the target script file appears in an executable position
+        without a ``scripts/`` path prefix.
+    """
+
+    script_file = re.escape(f"{script_name}.py")
+    pattern = re.compile(
+        rf"{COMMAND_START_OR_SEPARATOR}"
+        rf"(?:uv\s+run\s+|python(?:\d(?:\.\d+)?)?\s+|py\s+)?"
+        rf"[\"']?(?:\./)?{script_file}[\"']?"
+        rf"(?=$|[\s;&|])",
+        re.IGNORECASE,
+    )
+    return bool(pattern.search(command))
 
 
 def _truncate(text: str, *, max_length: int = MAX_COMMAND_LENGTH) -> str:

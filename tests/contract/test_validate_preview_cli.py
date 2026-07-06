@@ -84,12 +84,20 @@ def test_run_recog_rollup_preview_mode_dispatches_directory_source(monkeypatch) 
     class FakeService:
         """用于验证 preview 模式分发的假服务。"""
 
-        def run_preview(self, recog_id: str, period: str, source_file: Path) -> PreviewSuccessResponse:
+        def run_preview(
+            self,
+            recog_id: str,
+            period: str,
+            source_file: Path,
+            *,
+            result_file: Path | None = None,
+        ) -> PreviewSuccessResponse:
             """模拟 preview 成功。"""
 
             assert recog_id == "wechat_pay_settlement"
             assert period == "202605"
             assert source_file.name == source_dir.name
+            assert result_file is None
             return PreviewSuccessResponse(
                 recog_id=recog_id,
                 period=period,
@@ -119,6 +127,63 @@ def test_run_recog_rollup_preview_mode_dispatches_directory_source(monkeypatch) 
     assert payload["mode"] == "preview"
     assert payload["row_count"] == 12
     assert payload["field_count"] == 9
+
+
+def test_run_recog_rollup_preview_mode_forwards_result_file(monkeypatch) -> None:
+    """Preview mode should pass the requested output path to the service."""
+
+    source_dir = _make_test_dir("preview_result_file_source")
+    result_file = _make_test_dir("preview_result_file_output") / "preview.xlsx"
+    (source_dir / "placeholder.txt").write_text("placeholder", encoding="utf-8")
+
+    class FakeService:
+        """Fake service used to verify preview result_file dispatch."""
+
+        def run_preview(
+            self,
+            recog_id: str,
+            period: str,
+            source_file: Path,
+            *,
+            result_file: Path | None = None,
+        ) -> PreviewSuccessResponse:
+            """Return a successful preview response after checking arguments."""
+
+            assert recog_id == "wechat_pay_settlement"
+            assert period == "202605"
+            assert source_file.name == source_dir.name
+            assert result_file == requested_result_file
+            return PreviewSuccessResponse(
+                recog_id=recog_id,
+                period=period,
+                result_file=str(requested_result_file),
+                row_count=3,
+                field_count=2,
+                warnings=[],
+            )
+
+    requested_result_file = result_file
+    monkeypatch.setattr(run_recog_rollup, "build_service", lambda: FakeService())
+
+    result = runner.invoke(
+        run_recog_rollup.app,
+        [
+            "--preview",
+            "--recog_id",
+            "wechat_pay_settlement",
+            "--period",
+            "202605",
+            "--source_file",
+            str(source_dir),
+            "--result_file",
+            str(requested_result_file),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["mode"] == "preview"
+    assert payload["result_file"] == str(requested_result_file)
 
 
 def test_run_recog_rollup_validate_mode_reports_condition_boundary_guidance(monkeypatch) -> None:

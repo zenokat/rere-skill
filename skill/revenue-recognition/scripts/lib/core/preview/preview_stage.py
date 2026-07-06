@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +28,9 @@ from .preview_artifact_writer import PreviewArtifactWriter
 PERIOD_FIELD_NAME = "期间"
 
 
+ROW_PROGRESS_INTERVAL = 50000
+
+
 @dataclass(frozen=True)
 class SumExecutionPlan:
     """单个 SUM 规则在当前 sheet 上的执行计划。"""
@@ -45,9 +49,17 @@ class PreviewStageImpl:
         self._rule_repository = rule_repository
         self._artifact_writer = artifact_writer
 
-    def run(self, recog_id: str, period: str, source_file: Path) -> PreviewSuccessResponse:
+    def run(
+        self,
+        recog_id: str,
+        period: str,
+        source_file: Path,
+        *,
+        result_file: Path | None = None,
+    ) -> PreviewSuccessResponse:
         """执行试算。"""
 
+        preview_started = time.perf_counter()
         print(f"[preview] Starting preview for {recog_id} (period={period})...", file=sys.stderr, flush=True)
 
         source_files = discover_source_files(source_file)
@@ -68,6 +80,34 @@ class PreviewStageImpl:
         load_cache = SourceFileLoadCache()
 
         for file_index, current_file in enumerate(source_files, start=1):
+            file_started = time.perf_counter()
+            file_processed_rows = 0
+
+            def report_progress(row_number: int) -> None:
+                """Print periodic progress for long-running source files.
+
+                Args:
+                    row_number: Current physical source row number.
+
+                Returns:
+                    None.
+                """
+
+                nonlocal file_processed_rows
+                file_processed_rows += 1
+                if file_processed_rows % ROW_PROGRESS_INTERVAL != 0:
+                    return
+                elapsed_seconds = time.perf_counter() - file_started
+                print(
+                    (
+                        f"[preview] Processing file {file_index}/{len(source_files)}: "
+                        f"{current_file.name} rows={file_processed_rows} "
+                        f"last_row={row_number} elapsed={elapsed_seconds:.1f}s"
+                    ),
+                    file=sys.stderr,
+                    flush=True,
+                )
+
             print(f"[preview] Processing file {file_index}/{len(source_files)}: {current_file.name}...", file=sys.stderr, flush=True)
             for source_spec in rule_bundle.source_sheets:
                 try:
@@ -76,6 +116,7 @@ class PreviewStageImpl:
                         source_spec,
                         load_cache=load_cache,
                         stream_to_end=True,
+                        progress_callback=report_progress,
                     )
                 except KeyError:
                     if source_spec.optional:
@@ -169,6 +210,17 @@ class PreviewStageImpl:
                             )
                         )
 
+            elapsed_seconds = time.perf_counter() - file_started
+            print(
+                (
+                    f"[preview] Finished file {file_index}/{len(source_files)}: "
+                    f"{current_file.name}; rows={file_processed_rows}; "
+                    f"elapsed={elapsed_seconds:.1f}s"
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
+
         if issues:
             raise CliExecutionError(
                 exit_code=ExitCode.PREVIEW_FAILED,
@@ -188,8 +240,23 @@ class PreviewStageImpl:
         ordered_records = self._order_records(records=normalized_records, group_fields=group_fields, sum_rules=sum_rules)
 
         print("[preview] Writing output artifact...", file=sys.stderr, flush=True)
-        artifact = self._artifact_writer.write(recog_id=recog_id, period=period, records=ordered_records, group_fields=group_fields)
-        print(f"[preview] Preview complete: {artifact.row_count} rows, {artifact.field_count} fields -> {artifact.result_file}", file=sys.stderr, flush=True)
+        artifact = self._artifact_writer.write(
+            recog_id=recog_id,
+            period=period,
+            records=ordered_records,
+            group_fields=group_fields,
+            result_file=result_file,
+        )
+        total_elapsed_seconds = time.perf_counter() - preview_started
+        print(
+            (
+                f"[preview] Preview complete: {artifact.row_count} rows, "
+                f"{artifact.field_count} fields -> {artifact.result_file}; "
+                f"elapsed={total_elapsed_seconds:.1f}s"
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
         return PreviewSuccessResponse(
             recog_id=recog_id,
             period=period,
