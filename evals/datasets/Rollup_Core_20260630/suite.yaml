@@ -10,6 +10,7 @@ graders:
   - "skill_script_called:run_recog_rollup"
   - "skill_script_args:run_recog_rollup:--validate"
   - "skill_script_args:run_recog_rollup:--preview"
+  - "case_max_duration:600"
 input: d:/AI/rere-agent/202605-source-excel
 skills: d:/AI/rere-agent/skill
 cases:

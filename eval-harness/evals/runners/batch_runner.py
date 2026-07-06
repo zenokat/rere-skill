@@ -22,6 +22,7 @@ from evals.cases.model_config_file import (
     fingerprint_model_config_file,
     validate_model_config_file,
 )
+from evals.graders.case_max_duration import grade_case_max_duration
 from evals.graders.preview_matches_baseline import grade_preview_matches_baseline
 from evals.graders.preview_file_exists import grade_preview_file_exists
 from evals.graders.skill_script_called import grade_skill_script_called
@@ -328,6 +329,15 @@ class BatchRunner:
                         session_jsonl=case_layout.session_jsonl,
                         script_name=script_name,
                         arg_pattern=arg_pattern,
+                    )
+                )
+                continue
+            if grader_id.startswith("case_max_duration:"):
+                max_seconds = int(grader_id.split(":", 1)[1])
+                results.append(
+                    grade_case_max_duration(
+                        result_json=case_layout.result_json,
+                        max_seconds=max_seconds,
                     )
                 )
                 continue
