@@ -24,6 +24,8 @@ from evals.cases.model_config_file import (
 )
 from evals.graders.preview_matches_baseline import grade_preview_matches_baseline
 from evals.graders.preview_file_exists import grade_preview_file_exists
+from evals.graders.skill_script_called import grade_skill_script_called
+from evals.graders.skill_script_args import grade_skill_script_args
 from evals.reports.serializers import write_json
 from evals.sandbox.case_sandbox import CaseSandboxBuilder, copy_outputs_to_result, remove_sandbox
 from evals.shared.ids import make_batch_id
@@ -307,6 +309,27 @@ class BatchRunner:
                 continue
             if grader_id == "preview_matches_baseline":
                 results.append(grade_preview_matches_baseline(outputs_dir=case_layout.outputs_dir))
+                continue
+            if grader_id.startswith("skill_script_called:"):
+                script_name = grader_id.split(":", 1)[1]
+                results.append(
+                    grade_skill_script_called(
+                        session_jsonl=case_layout.session_jsonl,
+                        script_name=script_name,
+                    )
+                )
+                continue
+            if grader_id.startswith("skill_script_args:"):
+                parts = grader_id.split(":", 2)
+                script_name = parts[1]
+                arg_pattern = parts[2]
+                results.append(
+                    grade_skill_script_args(
+                        session_jsonl=case_layout.session_jsonl,
+                        script_name=script_name,
+                        arg_pattern=arg_pattern,
+                    )
+                )
                 continue
             raise ValueError(f"unknown grader: {grader_id}")
         return results
