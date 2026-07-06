@@ -56,8 +56,9 @@ class CaseArtifactLayout:
     Args:
         case_dir: Public case result directory.
         result_json: Public single-case result file.
-        session_jsonl: Public raw CodeBuddy session JSONL file (the single
-            source of truth for the agent trajectory).
+        session_jsonl: Public redacted CodeBuddy session JSONL file. It keeps
+            event structure for trajectory review while removing secrets before
+            the result bundle is committed.
         outputs_dir: Public business outputs directory.
         sandbox_dir: Internal disposable runtime sandbox.
         codebuddy_config_dir: Internal CodeBuddy state directory outside the case workspace.

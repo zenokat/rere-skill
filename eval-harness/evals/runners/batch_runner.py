@@ -29,6 +29,7 @@ from evals.graders.preview_matches_baseline import grade_preview_matches_baselin
 from evals.graders.preview_file_exists import grade_preview_file_exists
 from evals.graders.skill_script_called import grade_skill_script_called
 from evals.graders.skill_script_args import grade_skill_script_args
+from evals.privacy.redaction import RedactionReport, SecretRedactor, collect_sensitive_values
 from evals.reports.serializers import write_json
 from evals.runners.background_tasks import (
     PendingBackgroundTasks,
@@ -184,6 +185,8 @@ class BatchRunner:
 
         case_started_perf = time.perf_counter()
         case_layout = layout.ensure_case_dirs(case.case_id)
+        redactor = _build_case_redactor(model_request=model_request)
+        redaction_report = RedactionReport()
         cleanup_errors: list[str] = []
 
         try:
@@ -199,9 +202,11 @@ class BatchRunner:
                 env=_default_codebuddy_env(case_layout=case_layout, model_request=model_request),
             )
             runner_result = self._runner.run_case(target=target, case=case, workspace_dir=sandbox.root)
-            session_missing = _copy_session_raw(
+            session_missing = _copy_session_redacted(
                 case_layout=case_layout,
                 session_file=runner_result.session_file,
+                redactor=redactor,
+                report=redaction_report,
             )
             pending_background_tasks = _pending_background_tasks(
                 runner_result=runner_result,
@@ -226,6 +231,8 @@ class BatchRunner:
                     *([f"sandbox_cleanup_failed: {item}" for item in cleanup_errors]),
                 ],
                 background_wait=background_wait,
+                redactor=redactor,
+                redaction_report=redaction_report,
             )
         except Exception as exc:
             cleanup_errors.extend(_cleanup_runtime_dirs(case_layout))
@@ -237,6 +244,8 @@ class BatchRunner:
                 error=exc,
                 cleanup_errors=cleanup_errors,
                 model_request=model_request,
+                redactor=redactor,
+                redaction_report=redaction_report,
             )
 
         write_json(case_layout.result_json, result_payload)
@@ -253,6 +262,8 @@ class BatchRunner:
         model_request: RuntimeModelRequest,
         missing_evidence: list[str],
         background_wait: BackgroundOutputWaitResult,
+        redactor: SecretRedactor | None = None,
+        redaction_report: RedactionReport | None = None,
     ) -> dict[str, Any]:
         """Build the successful or runner-failed result payload.
 
@@ -266,18 +277,23 @@ class BatchRunner:
             missing_evidence: Missing evidence labels.
             background_wait: Background task wait summary collected before
                 copying business outputs.
+            redactor: Optional redactor used for public result strings.
+            redaction_report: Optional metadata collector shared with
+                ``session.jsonl`` redaction.
 
         Returns:
             `result.json` payload.
         """
 
+        active_redactor = redactor or SecretRedactor()
+        active_report = redaction_report or RedactionReport()
         status = "completed" if runner_result.exit_code == 0 and not background_wait.timed_out else "failed"
         payload: dict[str, Any] = {
             "case_id": case.case_id,
             "status": status,
             "verdict": "fail",
             "score": 0,
-            "final_response": runner_result.final_message,
+            "final_response": active_redactor.redact_text(runner_result.final_message, active_report),
             "model": _case_model_payload(model_request, observed_model=runner_result.model),
             "metrics": {
                 "duration_ms": duration_ms,
@@ -289,6 +305,7 @@ class BatchRunner:
                 "session_path": "session.jsonl",
                 "outputs_path": "outputs/",
                 "missing": missing_evidence,
+                "redaction": active_report.to_payload(),
             },
         }
         if background_wait.task_ids:
@@ -300,9 +317,10 @@ class BatchRunner:
         write_json(case_layout.result_json, payload)
         graders = self._run_graders(manifest=manifest, case_layout=case_layout)
         score = 1 if status == "completed" and all(item["score"] == 1 for item in graders) else 0
-        payload["graders"] = graders
+        payload["graders"] = active_redactor.redact_jsonable(graders, active_report)
         payload["score"] = score
         payload["verdict"] = "pass" if score == 1 else "fail"
+        payload["evidence"]["redaction"] = active_report.to_payload()
         return payload
 
     def _build_failed_result_payload(
@@ -314,6 +332,8 @@ class BatchRunner:
         error: Exception,
         cleanup_errors: list[str],
         model_request: RuntimeModelRequest,
+        redactor: SecretRedactor | None = None,
+        redaction_report: RedactionReport | None = None,
     ) -> dict[str, Any]:
         """Build a result payload for harness-level failures.
 
@@ -324,11 +344,16 @@ class BatchRunner:
             error: Raised exception.
             cleanup_errors: Sandbox cleanup errors, if any.
             model_request: Model id and optional config passed to CodeBuddy.
+            redactor: Optional redactor used for public error text.
+            redaction_report: Optional metadata collector shared with any
+                earlier redaction step.
 
         Returns:
             Failed `result.json` payload.
         """
 
+        active_redactor = redactor or SecretRedactor()
+        active_report = redaction_report or RedactionReport()
         missing = ["runner_result"]
         if not case_layout.session_jsonl.exists():
             missing.append("codebuddy_session_jsonl")
@@ -339,7 +364,7 @@ class BatchRunner:
             "status": "failed",
             "verdict": "fail",
             "score": 0,
-            "final_response": str(error),
+            "final_response": active_redactor.redact_text(str(error), active_report),
             "model": _case_model_payload(model_request, observed_model=None),
             "metrics": {
                 "duration_ms": duration_ms,
@@ -351,6 +376,7 @@ class BatchRunner:
                 "session_path": "session.jsonl",
                 "outputs_path": "outputs/",
                 "missing": missing,
+                "redaction": active_report.to_payload(),
             },
         }
 
@@ -585,10 +611,11 @@ def _background_wait_evidence(background_wait: BackgroundOutputWaitResult) -> di
 
 
 def _read_session_events(session_jsonl: Path) -> list[dict[str, Any]]:
-    """Read raw session events from a copied ``session.jsonl`` file.
+    """Read session events from a copied, public ``session.jsonl`` file.
 
     Args:
-        session_jsonl: Public case session JSONL path.
+        session_jsonl: Public case session JSONL path. The file is expected to
+            be redacted before graders read it.
 
     Returns:
         Parsed event dictionaries. Malformed lines are skipped.
@@ -734,6 +761,44 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _build_case_redactor(*, model_request: RuntimeModelRequest) -> SecretRedactor:
+    """Build the redactor used for one case's public artifacts.
+
+    Args:
+        model_request: Resolved model request. When a suite-level model config
+            is used, sensitive scalar values from that file are added as known
+            secrets.
+
+    Returns:
+        SecretRedactor configured with evaluator-provided credentials and model
+        configuration secrets that may appear in CodeBuddy tool output.
+    """
+
+    known_secrets = dict(_load_feishu_credentials())
+    if model_request.config_file:
+        known_secrets.update(_model_config_secret_values(model_request.config_file))
+    return SecretRedactor(known_secrets)
+
+
+def _model_config_secret_values(config_file: Path) -> dict[str, str]:
+    """Collect known secret values from a suite ``models.json`` file.
+
+    Args:
+        config_file: Resolved CodeBuddy model configuration file.
+
+    Returns:
+        Mapping of redaction labels to sensitive scalar values. Invalid or
+        unreadable JSON returns an empty mapping because model validation already
+        reports configuration errors elsewhere.
+    """
+
+    try:
+        payload = json.loads(config_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return collect_sensitive_values(payload, prefix="model_config")
+
+
 def _cleanup_runtime_dirs(case_layout: CaseArtifactLayout) -> list[str]:
     """Remove disposable case runtime directories.
 
@@ -754,20 +819,27 @@ def _cleanup_runtime_dirs(case_layout: CaseArtifactLayout) -> list[str]:
     return cleanup_errors
 
 
-def _copy_session_raw(*, case_layout: CaseArtifactLayout, session_file: str | None) -> list[str]:
-    """Copy the raw CodeBuddy session JSONL into the public result directory.
+def _copy_session_redacted(
+    *,
+    case_layout: CaseArtifactLayout,
+    session_file: str | None,
+    redactor: SecretRedactor,
+    report: RedactionReport,
+) -> list[str]:
+    """Copy a redacted CodeBuddy session JSONL into the public result directory.
 
     Args:
         case_layout: Case result paths.
         session_file: Original CodeBuddy session JSONL path captured by the
             headless runner, or None when no session was captured.
+        redactor: Case redactor configured with known evaluator secrets.
+        report: Shared redaction metadata collector.
 
     Returns:
         Missing evidence labels. Returns an empty list on success; returns
         ``["codebuddy_session_jsonl"]`` when the session path is missing or the
-        source file cannot be read. The raw session is the single source of
-        truth for the agent trajectory, so it is copied verbatim with no
-        normalization or path scrubbing.
+        source file cannot be read. The public session keeps the original event
+        structure but redacts secrets before writing.
 
     Notes:
         The content is read and written explicitly (instead of
@@ -781,7 +853,11 @@ def _copy_session_raw(*, case_layout: CaseArtifactLayout, session_file: str | No
         return ["codebuddy_session_jsonl"]
     source = as_filesystem_path(Path(session_file))
     try:
-        case_layout.session_jsonl.write_bytes(source.read_bytes())
+        raw_text = source.read_text(encoding="utf-8", errors="replace")
+        case_layout.session_jsonl.write_text(
+            redactor.redact_jsonl_text(raw_text, report),
+            encoding="utf-8",
+        )
     except OSError:
         return ["codebuddy_session_jsonl"]
     return []

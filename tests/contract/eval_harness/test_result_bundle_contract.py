@@ -63,11 +63,16 @@ def test_result_bundle_contains_only_minimal_public_files(tmp_path: Path, monkey
     assert result_payload["evidence"]["outputs_path"] == "outputs/"
     assert result_payload["evidence"]["missing"] == []
 
-    # session.jsonl is the verbatim raw CodeBuddy session; original event names
-    # (function_call, not tool_call) and full content are preserved.
+    # session.jsonl keeps original event names for grader compatibility, but
+    # sensitive command output is redacted before it enters the public bundle.
     session_text = (case_dir / "session.jsonl").read_text(encoding="utf-8")
-    assert '"type": "function_call"' in session_text
-    assert '"sessionId": "session-test"' in session_text
+    assert '"type":"function_call"' in session_text
+    assert '"sessionId":"session-test"' in session_text
+    assert "contract-secret-value" not in session_text
+    assert "<redacted:rere_feishu_app_secret>" in session_text
+    assert "sk-contract-hidden-value" not in result_payload["final_response"]
+    assert result_payload["evidence"]["redaction"]["enabled"] is True
+    assert result_payload["evidence"]["redaction"]["replacement_count"] >= 2
 
 
 def _fake_successful_codebuddy_run(self, *, target, case, workspace_dir):
@@ -83,7 +88,7 @@ def _fake_successful_codebuddy_run(self, *, target, case, workspace_dir):
     preview_file = workspace_dir / "output" / "preview.xlsx"
     preview_file.parent.mkdir(parents=True, exist_ok=True)
     preview_file.write_text("preview", encoding="utf-8")
-    final_message = "preview generated; upload not run."
+    final_message = "preview generated; apiKey=sk-contract-hidden-value; upload not run."
     session_events = [
         {
             "type": "message",
@@ -97,14 +102,17 @@ def _fake_successful_codebuddy_run(self, *, target, case, workspace_dir):
             "name": "Bash",
             "callId": "call-1",
             "status": "completed",
-            "output": {"type": "text", "text": f"result_file: {preview_file}"},
+            "output": {
+                "type": "text",
+                "text": f"RERE_FEISHU_APP_SECRET=contract-secret-value\nresult_file: {preview_file}",
+            },
             "sessionId": "session-test",
         },
         {"type": "reasoning", "rawContent": [{"type": "reasoning_text", "text": "hidden"}], "sessionId": "session-test"},
         {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": final_message}], "sessionId": "session-test"},
     ]
-    # The harness copies the raw session file verbatim, so the fake must write
-    # it to disk at the path it reports via session_file.
+    # The fake writes a realistic source session; the harness should redact it
+    # while copying into the public result bundle.
     session_path = workspace_dir / "session.jsonl"
     session_path.write_text(
         "\n".join(json.dumps(event, ensure_ascii=False) for event in session_events) + "\n",

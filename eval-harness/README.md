@@ -8,7 +8,7 @@
 
 - `batch.json`：整批评测有没有跑完、总共有多少 case、完成了多少、通过多少、失败多少、耗时多少。
 - `cases/<case_id>/result.json`：单条 case 的运行状态、模型最终回答、grader 判断、耗时和 token 指标。
-- `cases/<case_id>/session.jsonl`：CodeBuddy / WorkBuddy 原始 session JSONL，作为 Agent 轨迹的唯一事实源，逐行原文保留，不做归一化或路径屏蔽。
+- `cases/<case_id>/session.jsonl`：CodeBuddy / WorkBuddy session JSONL 的脱敏副本，保留 Agent 轨迹事件结构，但会把密钥、token、API Key 等敏感值替换为 `<redacted:...>` 占位符。
 - `cases/<case_id>/outputs/`：这条 case 在隔离环境里产出的业务文件，例如 preview Excel。
 
 首版不做 baseline 保存与比较，不生成 Markdown 报告，不生成重复 JSON 视图，不提供多套 profile。评测者只有一条固定路径：组织 case 文件夹，运行评测命令，读取结果文件。
@@ -385,7 +385,12 @@ codex -C D:\AI\rere-agent --sandbox danger-full-access
   "evidence": {
     "session_path": "session.jsonl",
     "outputs_path": "outputs/",
-    "missing": []
+    "missing": [],
+    "redaction": {
+      "enabled": true,
+      "replacement_count": 0,
+      "labels": []
+    }
   }
 }
 ```
@@ -402,7 +407,7 @@ codex -C D:\AI\rere-agent --sandbox danger-full-access
 
 ## session.jsonl 怎么看
 
-`session.jsonl` 是 CodeBuddy / WorkBuddy 原始 session 的逐行原文，每一行是一个原始事件 JSON。它是 Agent 轨迹的**唯一事实源**：harness 直接把 CodeBuddy 写出的 session 文件原样复制过来，不做归一化、不重命名事件、不屏蔽路径、不丢弃字段。
+`session.jsonl` 是 CodeBuddy / WorkBuddy session 的逐行 JSONL 副本，每一行是一个事件 JSON。它保留 Agent 轨迹的关键事实：消息、工具调用、工具返回、模型元数据和 session id；写入公开结果目录前，harness 会统一脱敏密钥、token、API Key、Bearer token、敏感环境变量赋值等内容。
 
 原始事件类型由 CodeBuddy 决定，常见的有：
 
@@ -411,16 +416,16 @@ codex -C D:\AI\rere-agent --sandbox danger-full-access
 | `message` + `role=user` | 用户消息（含 system-reminder 上下文与 user_query） |
 | `message` + `role=assistant` | Agent 回复（含完整 output_text） |
 | `function_call` | 工具调用（含完整 arguments） |
-| `function_call_result` | 工具返回（含完整 stdout/stderr/exit code） |
-| `reasoning` | 底层思维链（按 CodeBuddy 原样保留） |
+| `function_call_result` | 工具返回（敏感值会被替换为 `<redacted:...>`） |
+| `reasoning` | CodeBuddy 写入 session 的 reasoning 事件（敏感值会被替换为 `<redacted:...>`） |
 
-事件里还包含 `providerData`（模型、token 用量）、`sessionId`、时间戳等原始字段，全部保留。评测者可以直接在原始事件里看到 Agent 实际读了哪个文件、跑了什么命令、工具返回了什么——包括完整路径，不会有 `<host-path>` 之类的屏蔽。
+事件里还包含 `providerData`（模型、token 用量）、`sessionId`、时间戳等字段。评测者可以从事件里看到 Agent 实际读了哪个文件、跑了什么命令、工具返回了什么；如果工具输出里出现凭据，公开结果只保留占位符。
 
-注意：`session.jsonl` 是原始敏感证据包，可能包含工具输出里的环境变量、凭据片段、绝对路径、provider 细节和 `reasoning`。它适合本地复盘和受控归档，不适合公开分享；如果真实凭据被采进 session，应先轮换凭据，再分发结果包。
+注意：公开结果包里的 `session.jsonl` 默认是脱敏版本，适合随评测结果一起提交。脱敏只能处理已知密钥值和常见敏感形态；如果评测过程中确认真实凭据曾经进入过历史 commit 或外部系统，仍应轮换凭据。
 
 Windows 上 CodeBuddy state 里的真实 session 路径可能超过 260 字符。harness 采集时必须支持 Windows 扩展长路径读取 `codebuddy-state/<case>/projects/<cwd-id>/*.jsonl`；结果包里仍只暴露普通相对路径 `session.jsonl`。
 
-因为它是原始 session，体量较大且包含 provider 细节。如果只需要快速复盘核心对话与工具使用，可以用 `tools/transcript-jsonl-viewer.html` 在浏览器里渲染，或自行写筛选脚本读取。
+因为它仍保留完整事件结构，体量可能较大。如果只需要快速复盘核心对话与工具使用，可以用 `tools/transcript-jsonl-viewer.html` 在浏览器里渲染，或自行写筛选脚本读取。
 
 如果某条 case 没有捕获到 session（例如环境失败、CodeBuddy 未写出 session 文件），`session.jsonl` 不会生成，并在 `result.json` 的 `evidence.missing` 里记为 `codebuddy_session_jsonl`。
 
