@@ -22,6 +22,13 @@
 {
   "batch_id": "20260627-130214-revenue-recognition-real-smoke",
   "suite_id": "revenue-recognition-real-smoke",
+  "model": {
+    "requested": "glm-5",
+    "config": {
+      "source": "suite_config_file",
+      "fingerprint": "sha256:9d3f0c9a2c4b7e11"
+    }
+  },
   "status": "passed",
   "case_counts": {
     "total": 1,
@@ -44,7 +51,7 @@
 }
 ```
 
-`batch.json` 只表达批次总体情况，不包含 case 数组。每条 case 的细节固定写在 `cases/<case_id>/result.json`。
+`batch.json` 只表达批次总体情况，不包含 case 数组。`model.requested` 记录本批请求的 CodeBuddy 模型 ID；来源可以是 suite.yaml 的 `model.id`，也可以是 CLI `--model` 临时覆盖。如果没有指定模型，值为 `null`，表示使用 CodeBuddy 默认模型。声明 suite `model.config_file` 时，`model.config` 会记录配置来源和指纹，但不会记录本机路径、文件内容或 API key。每条 case 的细节固定写在 `cases/<case_id>/result.json`。
 
 ## result.json
 
@@ -55,6 +62,14 @@
   "verdict": "pass",
   "score": 1,
   "final_response": "Preview generated under output/preview.xlsx; upload was not run.",
+  "model": {
+    "requested": "glm-5",
+    "observed": "glm-5",
+    "config": {
+      "source": "suite_config_file",
+      "fingerprint": "sha256:9d3f0c9a2c4b7e11"
+    }
+  },
   "metrics": {
     "duration_ms": 48231,
     "tokens": {
@@ -78,6 +93,19 @@
         "size_bytes": 18642,
         "sha256": "..."
       }
+    },
+    {
+      "id": "preview_matches_baseline",
+      "type": "code",
+      "score": 1,
+      "summary": "All preview rows match baseline records.",
+      "evidence": {
+        "recog_id": "dine_in_revenue",
+        "period": "202605",
+        "preview_count": 1,
+        "baseline_count": 1,
+        "difference_count": 0
+      }
     }
   ],
   "evidence": {
@@ -88,7 +116,7 @@
 }
 ```
 
-`score` 只能是 `1` 或 `0`。`verdict` 固定由 graders 计算：全 1 为 `pass`，有 0 为 `fail`。
+`score` 只能是 `1` 或 `0`。`verdict` 固定由 graders 计算：全 1 为 `pass`，有 0 为 `fail`。`model.requested` 是本次请求的模型，`model.observed` 是 CodeBuddy session 或 stdout 中实际采到的模型；采不到时为 `null`。`model.config` 只在使用 suite `model.config_file` 时出现，用于证明本次运行复制了哪一份自定义模型配置，不包含 API key。
 
 ## session.jsonl
 

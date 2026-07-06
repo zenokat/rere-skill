@@ -5,7 +5,8 @@
 ```powershell
 .\.codex\scripts\rere.cmd run_skill_eval_batch `
   --suite <suite.yaml> `
-  --output_root <output-dir>
+  --output_root <output-dir> `
+  [--model <model-id>]
 ```
 
 ## Arguments
@@ -14,27 +15,39 @@
 |---|---|
 | `--suite` | 评测集 YAML 路径。 |
 | `--output_root` | 评测结果输出根目录。 |
+| `--model` | 可选临时覆盖值。传入后覆盖 `suite.yaml` 的 `model.id`；不传时使用 suite 配置或 CodeBuddy 默认模型。 |
 
 首版不提供 runner/profile/baseline/OTel/raw session 参数。
+
+正式评测的模型应写在 suite YAML：
+
+```yaml
+model:
+  id: glm-5
+  config_file: ${EVAL_MODELS_JSON}
+```
+
+`config_file` 指向 CodeBuddy `models.json`。声明后，harness 会先校验该文件定义了 `model.id`，再把它复制到每条 case 的隔离 `CODEBUDDY_CONFIG_DIR/models.json`。复制后的配置文件不会进入公开结果包。
 
 ## Per Case Flow
 
 每条 case 按以下顺序执行：
 
-1. 读取 `cases/<case_id>/instruction.md`、`skills/` 和 `input/`。
+1. 读取 `cases/<case_id>/instruction.md`、`skills/` 和 `input/`；当 case 级 `skills/` 或 `input/` 为空时，回退到 suite 级共享路径（如有声明）。
 2. 在公开结果包之外创建一次性 sandbox workspace。
-3. 复制 `input/` 到 sandbox。
+3. 复制 `input/`（或 suite 级共享 input）到 sandbox。
 4. 创建 sandbox `output/`。
-5. 将 `skills/<skill-name>/` materialize 为 `.workbuddy/skills/<skill-name>/`。
+5. 将 `skills/<skill-name>/`（或 suite 级共享 skills 中的子目录）materialize 为 `.workbuddy/skills/<skill-name>/`。
 6. 生成 WorkBuddy 风格 `system-reminder` 启动上下文，把 `instruction.md` 原文放入 `<user_query>`。
 7. 如果 `<user_query>` 中包含 `/<skill-name>`，注入对应 `manually_attached_skills`。
-8. 以 sandbox workspace 为 cwd 运行 CodeBuddy CLI，并启用 Docker/OCI 容器隔离。
-9. 从 stdout 或 session JSONL 回收最终响应。
-10. 把 CodeBuddy 原始 session JSONL 原样复制为 `session.jsonl`。
-11. 复制 sandbox `output/` 到结果目录 `outputs/`。
-12. 运行 suite YAML 声明的 graders。
-13. 写入 `result.json`。
-14. 销毁 sandbox。
+8. 解析 suite 级 `model`；如果声明了 `model.config_file`，校验其中包含本次请求的模型 ID，并复制到隔离 CodeBuddy 配置目录。
+9. 以 sandbox workspace 为 cwd 运行 CodeBuddy CLI，并启用 Docker/OCI 容器隔离；如果 suite 或 CLI 指定了模型，同步传给 CodeBuddy。
+10. 从 stdout 或 session JSONL 回收最终响应。
+11. 把 CodeBuddy 原始 session JSONL 原样复制为 `session.jsonl`。
+12. 复制 sandbox `output/` 到结果目录 `outputs/`。
+13. 运行 suite YAML 声明的 graders。
+14. 写入 `result.json`。
+15. 销毁 sandbox。
 
 如果 sandbox、Docker 或 CodeBuddy 容器运行能力不可用，case 失败并写入 `result.json`；不得退回宿主机裸跑。
 

@@ -528,7 +528,7 @@ def _summarize_session_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "session_id": str(session_id) if session_id else None,
         "assistant_text": _join_output_text(assistant.get("content", [])),
-        "model": provider_data.get("model") or provider_data.get("requestModelName"),
+        "model": provider_data.get("requestModelId") or provider_data.get("model") or provider_data.get("requestModelName"),
         "usage": provider_data.get("usage") or message_payload.get("usage"),
         "events": events,
     }

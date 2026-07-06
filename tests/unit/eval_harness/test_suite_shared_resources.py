@@ -12,6 +12,7 @@ These tests verify two layers:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -38,6 +39,8 @@ def _build_suite(
     grader: str = "preview_file_exists",
     shared_input: Path | None = None,
     shared_skills: Path | None = None,
+    model_id: str | None = None,
+    model_config_file: Path | None = None,
     case_ids: list[str] | None = None,
 ) -> Path:
     """Scaffold a complete, loadable suite directory.
@@ -48,6 +51,8 @@ def _build_suite(
         grader: Single grader id.
         shared_input: If provided, written as suite-level ``input`` in YAML.
         shared_skills: If provided, written as suite-level ``skills`` in YAML.
+        model_id: If provided, written as suite-level ``model.id`` in YAML.
+        model_config_file: Optional suite-level ``model.config_file`` path.
         case_ids: Case folder names to create (each with ``instruction.md``,
             ``input/``, ``skills/``).
 
@@ -75,6 +80,10 @@ def _build_suite(
     lines: list[str] = [f"suite_id: {suite_id}", "graders:", f"  - {grader}", "cases:"]
     for cid in case_ids:
         lines.append(f"  - {cid}")
+    if model_id is not None:
+        lines.extend(["model:", f"  id: {model_id}"])
+        if model_config_file is not None:
+            lines.append(f"  config_file: {model_config_file}")
     if shared_input is not None:
         lines.append(f"input: {shared_input}")
     if shared_skills is not None:
@@ -184,6 +193,17 @@ class TestSuiteSharedResourcesManifest:
         assert manifest.suite_shared_input is None
         assert manifest.suite_shared_skills is None
 
+    def test_manifest_accepts_utf8_bom(self, tmp_path: Path) -> None:
+        """Windows-authored UTF-8 files with BOM should still load."""
+
+        suite_yaml = _build_suite(tmp_path=tmp_path)
+        text = suite_yaml.read_text(encoding="utf-8")
+        suite_yaml.write_text("\ufeff" + text, encoding="utf-8")
+
+        manifest = load_suite_manifest(suite_yaml)
+
+        assert manifest.suite_id == "test-suite"
+
     def test_nonexistent_shared_input_rejected(self, tmp_path: Path) -> None:
         """A shared input path that does not exist triggers ManifestLoadError."""
 
@@ -228,6 +248,91 @@ class TestSuiteSharedResourcesManifest:
         manifest = load_suite_manifest(suite_yaml)
 
         assert manifest.suite_shared_input == shared_input.resolve()
+
+
+class TestSuiteModelConfigManifest:
+    """Suite-level ``model`` is parsed and guarded against silent fallback."""
+
+    def test_model_config_file_parsed(self, tmp_path: Path) -> None:
+        """A valid suite model config is attached to the manifest."""
+
+        model_config_file = tmp_path / "models.json"
+        model_config_file.write_text(
+            json.dumps(
+                {
+                    "models": [{"id": "glm-5", "apiKey": "secret", "url": "https://example.test/v1/chat/completions"}],
+                    "availableModels": ["glm-5"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        suite_yaml = _build_suite(
+            tmp_path=tmp_path,
+            model_id="glm-5",
+            model_config_file=model_config_file,
+        )
+
+        manifest = load_suite_manifest(suite_yaml)
+
+        assert manifest.model is not None
+        assert manifest.model.id == "glm-5"
+        assert manifest.model.config_file == model_config_file.resolve()
+
+    def test_model_config_file_can_be_top_level_array(self, tmp_path: Path) -> None:
+        """CodeBuddy's top-level array ``models.json`` shorthand is accepted."""
+
+        model_config_file = tmp_path / "models.json"
+        model_config_file.write_text(
+            json.dumps([{"id": "glm-5", "apiKey": "secret", "url": "https://example.test/v1/chat/completions"}]),
+            encoding="utf-8",
+        )
+        suite_yaml = _build_suite(
+            tmp_path=tmp_path,
+            model_id="glm-5",
+            model_config_file=model_config_file,
+        )
+
+        manifest = load_suite_manifest(suite_yaml)
+
+        assert manifest.model is not None
+        assert manifest.model.config_file == model_config_file.resolve()
+
+    def test_model_config_file_must_define_requested_model(self, tmp_path: Path) -> None:
+        """A missing model id fails before CodeBuddy can fall back to built-ins."""
+
+        model_config_file = tmp_path / "models.json"
+        model_config_file.write_text(
+            json.dumps({"models": [{"id": "other-model", "apiKey": "secret"}]}),
+            encoding="utf-8",
+        )
+        suite_yaml = _build_suite(
+            tmp_path=tmp_path,
+            model_id="glm-5",
+            model_config_file=model_config_file,
+        )
+
+        with pytest.raises(ManifestLoadError, match="does not define model id: glm-5"):
+            load_suite_manifest(suite_yaml)
+
+    def test_model_config_file_resolves_environment_variable(self, tmp_path: Path, monkeypatch) -> None:
+        """``${VAR}`` model config paths are resolved at manifest load time."""
+
+        model_config_file = tmp_path / "models.json"
+        model_config_file.write_text(
+            json.dumps([{"id": "glm-5", "apiKey": "secret"}]),
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("EVAL_MODELS_JSON", str(model_config_file))
+        suite_yaml = _build_suite(
+            tmp_path=tmp_path,
+            model_id="glm-5",
+            model_config_file=Path("${EVAL_MODELS_JSON}"),
+        )
+
+        manifest = load_suite_manifest(suite_yaml)
+
+        assert manifest.model is not None
+        assert manifest.model.config_file == model_config_file.resolve()
 
 
 # ---------------------------------------------------------------------------

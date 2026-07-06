@@ -8,7 +8,7 @@
 
 首版保留的能力：
 
-- suite YAML 只定义 `suite_id`、`graders` 和 `cases`。
+- suite YAML 只定义 `suite_id`、可选 `model`、`graders`、`cases`，可选 `input`/`skills` 共享路径。
 - 每条 case 是一个文件夹，包含 `instruction.md`、`skills/` 和 `input/`。
 - 每条 case 运行时在公开结果包之外创建一次性 sandbox workspace，并在结束后销毁。
 - sandbox 内按 WorkBuddy 形态提供 `.workbuddy/skills/<skill-name>/`。
@@ -22,7 +22,7 @@
 首版明确不做：
 
 - 仅依赖 CodeBuddy 权限体系作为主要隔离边界。
-- baseline 保存与比较。
+- baseline 快照保存（首版通过 `preview_matches_baseline` grader 支持逐行比对，但不保存 baseline 到结果包）。
 - Markdown 报告。
 - 重复 JSON 视图。
 - 多套 profile。
@@ -107,15 +107,28 @@ src/
 
 ### 1. 评测集输入
 
-suite YAML 只保留三块：
+suite YAML 只保留核心字段（外加可选的 suite 级模型和共享资源）：
 
 ```yaml
 suite_id: revenue-recognition-real-smoke
+model:
+  id: glm-5
+  config_file: ${EVAL_MODELS_JSON}
 graders:
   - preview_file_exists
+  - preview_matches_baseline
 cases:
   - revenue-recognition-dine-in-202605
 ```
+
+当多条 case 共用同一套 skill 和 input 时，可声明 suite 级共享路径：
+
+```yaml
+input: <共享输入目录>
+skills: <共享 skill 目录>
+```
+
+`model` 是可选字段；声明 `model.config_file` 时，文件必须定义 `model.id`。case 级 `input/` 或 `skills/` 为空时，harness 自动回退到 suite 级路径。
 
 case 的任务说明、skill 和输入文件放在 case 文件夹里：
 
@@ -177,18 +190,19 @@ sandbox 不生成：
 runner 流程固定：
 
 1. 读取 suite YAML。
-2. 验证每个 case 文件夹包含 `instruction.md`、`skills/` 和 `input/`。
+2. 验证每个 case 文件夹包含 `instruction.md`、`skills/` 和 `input/`；解析 suite 级 `model` 与共享 `input`/`skills` 路径（如有）。
 3. 为当前 case 创建 sandbox workspace。
-4. 复制 `input/`，创建 `output/`，按 WorkBuddy 风格 materialize skill。
+4. 复制 `input/`（case 级为空时回退到 suite 级共享路径），创建 `output/`，按 WorkBuddy 风格 materialize skill（case 级为空时回退到 suite 级共享路径）。
 5. 生成 WorkBuddy 风格 `system-reminder` + `<user_query>` 首条用户消息。
-6. 以 sandbox workspace 为 cwd 运行 `codebuddy -p <prompt> --sandbox container --sandbox-new --sandbox-kill --output-format json`。
-7. 从 stdout 或 session JSONL 回收最终响应。
-8. 将 CodeBuddy 写出的原始 session JSONL 原样复制为结果目录的 `session.jsonl`。
-9. 将 sandbox `output/` 复制到结果目录 `outputs/`。
-10. 执行 suite YAML 声明的 graders。
-11. 写入 `result.json`。
-12. 销毁 sandbox。
-13. 汇总写入 `batch.json`。
+6. 如果 suite 声明 `model.config_file`，校验并复制该 `models.json` 到隔离 CodeBuddy 配置目录。
+7. 以 sandbox workspace 为 cwd 运行 `codebuddy -p <prompt> --sandbox container --sandbox-new --sandbox-kill --output-format json`。
+8. 从 stdout 或 session JSONL 回收最终响应。
+9. 将 CodeBuddy 写出的原始 session JSONL 原样复制为结果目录的 `session.jsonl`。
+10. 将 sandbox `output/` 复制到结果目录 `outputs/`。
+11. 执行 suite YAML 声明的 graders。
+12. 写入 `result.json`。
+13. 销毁 sandbox。
+14. 汇总写入 `batch.json`。
 
 ### 5. 结果文件
 
@@ -234,6 +248,7 @@ grader 只输出 `1` 或 `0`。`verdict` 规则固定：所有 grader 都为 `1`
 ```yaml
 graders:
   - preview_file_exists
+  - preview_matches_baseline
 ```
 
 扩展 grader 必须遵守：
@@ -266,6 +281,6 @@ graders:
 - 契约层：suite YAML、case 文件夹、`batch.json`、`result.json`、`session.jsonl` 和 `outputs/` 字段稳定。
 - 隔离层：真实运行时 Agent 只能看到 sandbox workspace，不能看到仓库根目录或用户主目录。
 - 运行层：真实 CodeBuddy CLI 单 case 能跑通，并能拿到模型最终响应和 session。
-- 评分层：`preview_file_exists` 能基于 `outputs/` 给出 0/1 `score`，并由聚合规则生成 `verdict`。
+- 评分层：`preview_file_exists` 和 `preview_matches_baseline` 能基于 `outputs/` 给出 0/1 `score`，并由聚合规则生成 `verdict`。
 
 最终验收必须包含一次真实 CodeBuddy CLI 堂食收入 case 冒烟运行；如果当前 Docker、CodeBuddy 登录态或 skill 打包运行前提不满足，应明确判为环境失败，而不是降低隔离边界。

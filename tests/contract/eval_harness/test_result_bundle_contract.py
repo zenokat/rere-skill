@@ -50,11 +50,13 @@ def test_result_bundle_contains_only_minimal_public_files(tmp_path: Path, monkey
 
     batch_payload = json.loads((batch_dir / "batch.json").read_text(encoding="utf-8"))
     assert "cases" not in batch_payload
+    assert batch_payload["model"] == {"requested": None}
     assert batch_payload["case_counts"] == {"total": 1, "completed": 1, "passed": 1, "failed": 0}
 
     result_payload = json.loads((case_dir / "result.json").read_text(encoding="utf-8"))
     assert result_payload["score"] == 1
     assert result_payload["verdict"] == "pass"
+    assert result_payload["model"] == {"requested": None, "observed": None}
     assert result_payload["graders"][0]["id"] == "preview_file_exists"
     assert result_payload["graders"][0]["evidence"]["file"].startswith("outputs/")
     assert result_payload["evidence"]["session_path"] == "session.jsonl"

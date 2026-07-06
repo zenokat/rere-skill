@@ -2,7 +2,7 @@
 
 **Feature Branch**: `002-workbuddy-eval-harness`
 **Created**: 2026-06-25
-**Updated**: 2026-06-29
+**Updated**: 2026-07-02
 **Status**: Implemented
 
 ## User Need
@@ -22,8 +22,8 @@
 
 首版必须支持：
 
-- 用 suite YAML 定义 `suite_id`、case 列表和 graders。
-- 用 case 文件夹定义 `instruction.md`、`skills/` 和 `input/`。
+- 用 suite YAML 定义 `suite_id`、case 列表、graders 和可选的 suite 级共享 `input`/`skills` 路径。
+- 用 case 文件夹定义 `instruction.md`、`skills/` 和 `input/`；case 级目录为空时自动回退到 suite 级共享路径。
 - 每条 case 在公开结果包之外的一次性 sandbox workspace 中运行。
 - sandbox 内 skill 加载结构尽量还原 WorkBuddy 的 `.workbuddy/skills/<skill-name>/`。
 - 启动上下文尽量还原 WorkBuddy session 中观察到的 `system-reminder` 形态。
@@ -35,7 +35,7 @@
 首版不支持：
 
 - 仅依赖 CodeBuddy 权限体系作为主要隔离边界。
-- baseline 保存与比较。
+- baseline 保存与比较（首版通过 `preview_matches_baseline` grader 支持逐行比对，但不保存 baseline 快照到结果包）。
 - Markdown 报告。
 - 多套 profile。
 - fake runner 作为评测执行者路径。
@@ -77,9 +77,10 @@
 
 ## Functional Requirements
 
-- **FR-001**: 系统 MUST 支持从 suite YAML 读取 `suite_id`、`graders` 和 `cases`。
+- **FR-001**: 系统 MUST 支持从 suite YAML 读取 `suite_id`、`graders`、`cases`、可选的 `model` 和可选的 `input`/`skills` 共享路径。
+- **FR-001a**: 如果 suite YAML 声明 `model.config_file`，系统 MUST 校验该文件定义了本次请求的 `model.id`，并在每条 case 启动前复制到隔离 CodeBuddy 配置目录；不得静默回退到 CodeBuddy 内置模型。
 - **FR-002**: `cases` MUST 是 case 文件夹名列表。
-- **FR-003**: 每条 case 文件夹 MUST 包含 `instruction.md`、`skills/` 和 `input/`。
+- **FR-003**: 每条 case 文件夹 MUST 包含 `instruction.md`、`skills/` 和 `input/` 目录；当 `skills/` 或 `input/` 为空时，系统 MUST 回退到 suite 级共享路径（如果声明了）。
 - **FR-004**: 系统 MUST 不要求评测者在 case 中预设期望结果、关键词或分类。
 - **FR-005**: 系统 MUST 为每条 case 创建一次性 sandbox workspace。
 - **FR-006**: sandbox MUST 不挂载原始代码仓库和用户主目录。
@@ -102,6 +103,7 @@
 - **FR-023**: `result.json` MUST 包含运行状态、最终回答、二元分数、grader 输出、耗时、token、成本、session 路径、outputs 路径和证据缺口。
 - **FR-024**: token 和成本无法获取时，系统 MUST 写入 `null`，不得删除字段。
 - **FR-025**: 系统 MUST 支持 suite YAML 中声明的 `preview_file_exists` grader，检查本 case 的 `outputs/` 中是否存在 preview 文件。
+- **FR-025a**: 系统 MUST 支持 `preview_matches_baseline` grader，从 `outputs/` 的 preview Excel 中提取结果行并与飞书 baseline 记录逐行比对，完全一致给 `1`，有差异给 `0` 并报告差异详情。
 - **FR-026**: 系统 MUST 允许新增代码 grader 或模型 grader；grader 输出必须是 `score: 1` 或 `score: 0`，并写回 `result.json.graders[]`。
 - **FR-027**: 系统 MUST 按固定规则生成 `verdict`：所有 grader 都为 `1` 时为 `pass`，任一 grader 为 `0` 时为 `fail`。
 - **FR-028**: `session.jsonl` MUST 保留 CodeBuddy 原始事件与字段，包括 `message`、`function_call`、`function_call_result`、`reasoning`、`providerData`、`sessionId`、时间戳、工具参数和工具输出；不得归一化、重命名、屏蔽路径或丢弃字段。
@@ -114,8 +116,8 @@
 
 ## Key Entities
 
-- **EvalSuite**: 一个 suite YAML 和一组 case 文件夹。
-- **EvalCaseFolder**: 单条 case 的源材料目录，包含 `instruction.md`、`skills/` 和 `input/`。
+- **EvalSuite**: 一个 suite YAML 和一组 case 文件夹。suite YAML 可选声明 `input`/`skills` 共享路径，供所有 case 回退使用。
+- **EvalCaseFolder**: 单条 case 的源材料目录，包含 `instruction.md`、`skills/` 和 `input/`。`skills/` 和 `input/` 为空时可回退到 suite 级共享路径。
 - **CaseSandbox**: 单条 case 的一次性 sandbox workspace。
 - **WorkBuddyStartupContext**: 作为首条用户消息注入的 `system-reminder` 和 `<user_query>`。
 - **BatchResult**: 整批评测结果，对应 `batch.json`。

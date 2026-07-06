@@ -12,7 +12,7 @@
 
 ## Phase 2: Manifest 与 case 加载
 
-- [X] T008 更新 manifest 模型，只接受 `suite_id`、`graders`、`cases[]`。
+- [X] T008 更新 manifest 模型，只接受 `suite_id`、可选 `model`、`graders`、`cases[]`、可选 suite 级共享 `input`/`skills`。
 - [X] T009 删除旧 `skill.name`、`skill.path`、`cases[].prompt` 用户契约。
 - [X] T010 实现 case 文件夹校验：必须存在 `instruction.md`、`skills/`、`input/`。
 - [X] T011 校验 `cases[]` 只能引用 suite 目录下的 case 文件夹，禁止路径穿越。

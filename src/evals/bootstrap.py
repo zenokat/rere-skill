@@ -33,6 +33,7 @@ class EvalHarness:
         suite_path: Path,
         output_root: Path,
         selected_case_ids: list[str] | None = None,
+        model: str | None = None,
     ) -> dict[str, Any]:
         """运行一批评测 case。
 
@@ -40,6 +41,8 @@ class EvalHarness:
             suite_path: case manifest 路径。
             output_root: 输出根目录。
             selected_case_ids: 可选 case 白名单。
+            model: 可选模型 ID 覆盖值；为空时使用 suite.yaml 的 `model`
+                配置或 CodeBuddy 默认模型。
 
         Returns:
             dict[str, Any]: 批次结果。
@@ -50,6 +53,7 @@ class EvalHarness:
             manifest=manifest,
             output_root=output_root,
             selected_case_ids=selected_case_ids,
+            model=model,
         )
 
 

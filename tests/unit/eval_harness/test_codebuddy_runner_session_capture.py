@@ -95,6 +95,30 @@ def test_codebuddy_prompt_omits_manual_attachment_without_slash(tmp_path: Path) 
     assert "/revenue-recognition" not in command.stdin
 
 
+def test_codebuddy_command_includes_requested_model(tmp_path: Path) -> None:
+    """A requested model should be passed to CodeBuddy before print mode."""
+
+    case = EvalCase(
+        case_id="model-case",
+        case_dir=tmp_path / "case",
+        instruction_path=tmp_path / "case" / "instruction.md",
+        skills_dir=tmp_path / "case" / "skills",
+        input_dir=tmp_path / "case" / "input",
+        instruction="Run the eval with a specific model.",
+    )
+
+    command = CodeBuddyCommandBuilder().build(
+        target=TargetConfig(model="glm-5.2"),
+        case=case,
+        working_directory=tmp_path,
+        safety_decision=SafetyDecision(allowed=True, permission_mode="bypassPermissions"),
+    )
+
+    assert command.args[command.args.index("--model") + 1] == "glm-5.2"
+    assert command.args.index("--model") < command.args.index("-p")
+    assert "--model glm-5.2" in command.display
+
+
 def test_safety_guard_allows_negative_upload_instruction(tmp_path: Path) -> None:
     """Instructions that prohibit upload should still be runnable."""
 
@@ -253,3 +277,27 @@ def test_parse_stdout_event_array_extracts_final_answer() -> None:
     assert captured["assistant_text"] == "preview artifact generated"
     assert captured["model"] == "glm-test"
     assert captured["usage"] == {"totalTokens": 9}
+
+
+def test_session_summary_prefers_request_model_id_for_custom_models() -> None:
+    """Custom CodeBuddy models should report the request id, not only provider model."""
+
+    events = [
+        {
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": "preview artifact generated"}],
+            "providerData": {
+                "model": "glm-5.2",
+                "requestModelId": "custom-local:glm-5",
+                "requestModelName": "GLM-5",
+                "usage": {"totalTokens": 9},
+            },
+            "sessionId": "custom-model-session",
+        }
+    ]
+
+    captured = _summarize_session_events(events)
+
+    assert captured["model"] == "custom-local:glm-5"
+    assert captured["assistant_text"] == "preview artifact generated"

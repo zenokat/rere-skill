@@ -23,6 +23,7 @@ def run(
     suite: Path = typer.Option(..., "--suite", help="评测集 YAML 路径。"),
     output_root: Path = typer.Option(..., "--output_root", help="评测结果输出根目录。"),
     case: list[str] | None = typer.Option(None, "--case", help="仅运行指定 case，可重复传入。"),
+    model: str | None = typer.Option(None, "--model", help="临时覆盖 suite.yaml 的 model.id；为空时使用 suite 配置或 CodeBuddy 默认模型。"),
 ) -> None:
     """执行一批 skill 评测 case。
 
@@ -30,6 +31,8 @@ def run(
         suite: 评测集 YAML 路径。
         output_root: 输出根目录。
         case: 可选 case 白名单。
+        model: 可选模型 ID 覆盖值。正式评测应优先写在 suite.yaml 的
+            `model.id` 中。
 
     Returns:
         None。
@@ -42,6 +45,7 @@ def run(
             suite_path=suite,
             output_root=output_root,
             selected_case_ids=case,
+            model=model,
         )
         typer.echo(_stdout_summary(batch_payload, output_root))
         raise typer.Exit(0 if batch_payload["status"] == "passed" else 2)

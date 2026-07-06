@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from evals.cases.manifest_models import EvalCase, EvalSuiteManifest
+from evals.cases.model_config_file import resolve_model_config_file, validate_model_config_file
 
 
 class ManifestLoadError(ValueError):
@@ -35,7 +36,7 @@ def load_suite_manifest(path: Path) -> EvalSuiteManifest:
     if not path.exists():
         raise ManifestLoadError(f"manifest file does not exist: {path}")
     try:
-        raw_text = path.read_text(encoding="utf-8")
+        raw_text = path.read_text(encoding="utf-8").lstrip("\ufeff")
         payload = _load_mapping(raw_text, path.suffix.lower())
         resolved_payload = _resolve_suite_payload(payload, path.resolve())
         return EvalSuiteManifest.model_validate(resolved_payload)
@@ -100,7 +101,7 @@ def _resolve_suite_payload(payload: dict[str, Any], suite_path: Path) -> dict[st
         ManifestLoadError: If unsupported fields or invalid case folders exist.
     """
 
-    allowed_keys = {"suite_id", "graders", "cases", "input", "skills"}
+    allowed_keys = {"suite_id", "graders", "cases", "input", "skills", "model"}
     extra_keys = sorted(set(payload) - allowed_keys)
     if extra_keys:
         raise ManifestLoadError(f"unsupported suite field(s): {', '.join(extra_keys)}")
@@ -117,6 +118,7 @@ def _resolve_suite_payload(payload: dict[str, Any], suite_path: Path) -> dict[st
     # Parse suite-level shared resources.
     suite_shared_input = _resolve_shared_path(payload, "input", suite_path)
     suite_shared_skills = _resolve_shared_path(payload, "skills", suite_path)
+    suite_model = _resolve_suite_model(payload.get("model"), suite_path)
 
     resolved_cases = [
         _load_case_folder(
@@ -129,12 +131,54 @@ def _resolve_suite_payload(payload: dict[str, Any], suite_path: Path) -> dict[st
     ]
     return {
         "suite_id": payload.get("suite_id"),
+        "model": suite_model,
         "graders": raw_graders,
         "cases": resolved_cases,
         "source_path": suite_path,
         "suite_shared_input": suite_shared_input,
         "suite_shared_skills": suite_shared_skills,
     }
+
+
+def _resolve_suite_model(raw_model: object, suite_path: Path) -> dict[str, Any] | None:
+    """Resolve optional suite-level model configuration.
+
+    Args:
+        raw_model: Raw ``model`` value from the suite manifest.
+        suite_path: Absolute path to the suite manifest.
+
+    Returns:
+        Dictionary accepted by ``SuiteModelConfig``, or None when the suite does
+        not request a model.
+
+    Raises:
+        ManifestLoadError: If the shape is invalid or ``config_file`` does not
+            define the requested model id.
+    """
+
+    if raw_model is None:
+        return None
+    if not isinstance(raw_model, dict):
+        raise ManifestLoadError("model must be an object with id and optional config_file")
+
+    extra_keys = sorted(set(raw_model) - {"id", "config_file"})
+    if extra_keys:
+        raise ManifestLoadError(f"unsupported model field(s): {', '.join(extra_keys)}")
+
+    model_id = str(raw_model.get("id") or "").strip()
+    if not model_id:
+        raise ManifestLoadError("model.id cannot be empty")
+
+    resolved: dict[str, Any] = {"id": model_id}
+    raw_config_file = raw_model.get("config_file")
+    if raw_config_file is not None:
+        try:
+            config_file = resolve_model_config_file(raw_config_file, suite_path=suite_path)
+            validate_model_config_file(config_file=config_file, model_id=model_id)
+        except ValueError as exc:
+            raise ManifestLoadError(str(exc)) from exc
+        resolved["config_file"] = config_file
+    return resolved
 
 
 def _resolve_shared_path(payload: dict[str, Any], key: str, suite_path: Path) -> Path | None:

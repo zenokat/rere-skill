@@ -4,13 +4,18 @@
 
 评测集入口，来自 `suite.yaml`。
 
-| 字段 | 类型 | 含义 |
-|---|---|---|
-| `suite_id` | string | 评测集 ID。 |
-| `graders` | list[string] | 本批评测要运行的 grader ID。 |
-| `cases` | list[string] | case 文件夹名列表。 |
+| 字段 | 类型 | 必填 | 含义 |
+|---|---|---|---|
+| `suite_id` | string | 是 | 评测集 ID。 |
+| `model` | object | 否 | suite 级模型选择。首版一个 suite 只指定一个模型。 |
+| `model.id` | string | `model` 存在时必填 | CodeBuddy 模型 ID。 |
+| `model.config_file` | string | 否 | CodeBuddy `models.json` 路径。声明后必须包含 `model.id`，并会被复制到每条 case 的隔离 CodeBuddy 配置目录。 |
+| `graders` | list[string] | 是 | 本批评测要运行的 grader ID。 |
+| `cases` | list[string] | 是 | case 文件夹名列表。 |
+| `input` | string | 否 | suite 级共享输入目录。支持绝对路径或相对于 suite.yaml 的相对路径。case 级 `input/` 为空时自动回退。 |
+| `skills` | string | 否 | suite 级共享 skill 目录。支持绝对路径或相对于 suite.yaml 的相对路径。case 级 `skills/` 为空时自动回退。 |
 
-示例：
+示例（最小）：
 
 ```yaml
 suite_id: revenue-recognition-real-smoke
@@ -18,6 +23,32 @@ graders:
   - preview_file_exists
 cases:
   - revenue-recognition-dine-in-202605
+```
+
+示例（指定自定义模型配置）：
+
+```yaml
+suite_id: revenue-recognition-real-smoke
+model:
+  id: glm-5
+  config_file: ${EVAL_MODELS_JSON}
+graders:
+  - preview_file_exists
+cases:
+  - revenue-recognition-dine-in-202605
+```
+
+示例（带 suite 级共享资源）：
+
+```yaml
+suite_id: Rollup_Core_20260630
+graders:
+  - preview_file_exists
+  - preview_matches_baseline
+input: d:/AI/rere-agent/202605-source-excel
+skills: d:/AI/rere-agent/skill/revenue-recognition
+cases:
+  - dine_in_revenue_202605
 ```
 
 ## EvalCaseFolder
@@ -38,8 +69,8 @@ cases/<case_id>/
 | 路径 | 必填 | 含义 |
 |---|---|---|
 | `instruction.md` | 是 | 本 case 的用户任务、边界和必要提示。运行时作为 `<user_query>`，不复制进 workspace。 |
-| `skills/` | 是 | 本 case 提供给 Agent 的 skill 包。 |
-| `input/` | 是 | 本 case 允许 Agent 读取的输入文件。 |
+| `skills/` | 目录必须存在 | 本 case 提供给 Agent 的 skill 包。为空且 suite 级有 `skills` 声明时，自动回退到 suite 级共享路径。 |
+| `input/` | 目录必须存在 | 本 case 允许 Agent 读取的输入文件。为空且 suite 级有 `input` 声明时，自动回退到 suite 级共享路径。 |
 
 `case_id` 来自文件夹名，必须稳定，不能包含路径分隔符或路径穿越。
 
@@ -105,8 +136,11 @@ CodeBuddy 运行目标。
 | `skill_names` | list[string] | sandbox 内可见 skill 名称。 |
 | `skill_entries` | list[string] | sandbox 相对 `SKILL.md` 降级路径。 |
 | `codebuddy_executable` | string | CLI 可执行文件名，默认 `codebuddy`。 |
+| `model` | string/null | 可选 CodeBuddy 模型 ID；为空时使用 CodeBuddy 默认模型。 |
 | `use_container_sandbox` | boolean | 是否启用 Docker/OCI 容器隔离；默认启用。 |
 | `env` | object | CodeBuddy 进程的最小环境变量覆盖，不得包含仓库 tool-root 或隐藏运行时。 |
+
+当 suite 声明了 `model.config_file`，runner 会在每条 case 启动前把该文件复制到隔离的 `CODEBUDDY_CONFIG_DIR/models.json`，并设置 `CODEBUDDY_DISABLE_BUILTIN_MODELS=1`，降低误走内置模型的风险。公开结果只记录配置指纹，不记录路径、文件内容或 API key。
 
 ## BatchResult
 
@@ -116,6 +150,7 @@ CodeBuddy 运行目标。
 |---|---|---|
 | `batch_id` | string | 本次运行 ID。 |
 | `suite_id` | string | 评测集 ID。 |
+| `model` | object | 本批请求的模型信息，`requested` 为空表示使用 CodeBuddy 默认模型；使用 `model.config_file` 时包含 `config.source` 和 `config.fingerprint`。 |
 | `status` | enum | `passed` 或 `failed`。 |
 | `case_counts` | object | 总数、完成数、通过数、失败数。 |
 | `metrics` | object | 批次耗时、token、成本。 |
@@ -133,6 +168,7 @@ CodeBuddy 运行目标。
 | `verdict` | enum | `pass` 或 `fail`。 |
 | `score` | integer | `1` 或 `0`。 |
 | `final_response` | string | Agent 最终回答。 |
+| `model` | object | `requested` 为本次请求的模型，`observed` 为 session/stdout 实际采到的模型；使用 `model.config_file` 时包含不泄密的配置证据。 |
 | `metrics` | object | 单 case 耗时、token、成本。 |
 | `graders` | list[`GraderResult`] | 评分器结果列表。 |
 | `evidence` | object | session、outputs 和缺失证据。 |

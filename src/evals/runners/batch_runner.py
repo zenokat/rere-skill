@@ -11,11 +11,17 @@ from __future__ import annotations
 import os
 import shutil
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from evals.cases.case_selector import select_cases
-from evals.cases.manifest_models import EvalCase, EvalSuiteManifest, TargetConfig
+from evals.cases.manifest_models import EvalCase, EvalSuiteManifest, SuiteModelConfig, TargetConfig
+from evals.cases.model_config_file import (
+    copy_model_config_file,
+    fingerprint_model_config_file,
+    validate_model_config_file,
+)
 from evals.graders.preview_matches_baseline import grade_preview_matches_baseline
 from evals.graders.preview_file_exists import grade_preview_file_exists
 from evals.reports.serializers import write_json
@@ -24,6 +30,27 @@ from evals.shared.ids import make_batch_id
 from evals.shared.output_layout import CaseArtifactLayout, OutputLayout
 from evals.shared.windows_paths import as_filesystem_path
 from integrations.codebuddy_cli.headless_runner import CodeBuddyHeadlessRunner, HeadlessRunner, HeadlessRunResult
+
+
+@dataclass(frozen=True)
+class RuntimeModelRequest:
+    """Resolved model request for one eval batch.
+
+    Args:
+        id: CodeBuddy model id to pass to ``--model``. None means use the
+            CodeBuddy default.
+        config_file: Optional suite-level ``models.json`` to copy into each
+            isolated CodeBuddy config directory.
+        config_fingerprint: Short fingerprint for result evidence when
+            ``config_file`` is present.
+
+    Returns:
+        Immutable runtime model request.
+    """
+
+    id: str | None
+    config_file: Path | None = None
+    config_fingerprint: str | None = None
 
 
 class BatchRunner:
@@ -51,6 +78,7 @@ class BatchRunner:
         manifest: EvalSuiteManifest,
         output_root: Path,
         selected_case_ids: list[str] | None = None,
+        model: str | None = None,
     ) -> dict[str, Any]:
         """Run a full eval batch.
 
@@ -58,24 +86,30 @@ class BatchRunner:
             manifest: Loaded suite manifest.
             output_root: Evaluator-provided output root.
             selected_case_ids: Optional case allowlist.
+            model: Optional CodeBuddy model id requested for every case.
 
         Returns:
             `batch.json` payload.
         """
 
+        model_request = _build_runtime_model_request(suite_model=manifest.model, override_model=model)
         batch_started = time.perf_counter()
         batch_id = make_batch_id(manifest.suite_id)
         layout = OutputLayout(output_root=output_root, batch_id=batch_id)
         layout.ensure_batch_dirs()
 
         cases = select_cases(manifest, selected_case_ids)
-        case_payloads = [self._run_one_case(manifest=manifest, case=case, layout=layout) for case in cases]
+        case_payloads = [
+            self._run_one_case(manifest=manifest, case=case, layout=layout, model_request=model_request)
+            for case in cases
+        ]
 
         cleanup_internal_dir(layout.batch.sandboxes_dir)
         case_counts = _build_case_counts(case_payloads)
         batch_payload = {
             "batch_id": batch_id,
             "suite_id": manifest.suite_id,
+            "model": _batch_model_payload(model_request),
             "status": "passed" if case_counts["failed"] == 0 else "failed",
             "case_counts": case_counts,
             "metrics": {
@@ -93,6 +127,7 @@ class BatchRunner:
         manifest: EvalSuiteManifest,
         case: EvalCase,
         layout: OutputLayout,
+        model_request: RuntimeModelRequest,
     ) -> dict[str, Any]:
         """Run one case and write its result files.
 
@@ -100,6 +135,7 @@ class BatchRunner:
             manifest: Loaded suite manifest.
             case: Current case.
             layout: Batch output layout.
+            model_request: Batch-level model request for this case.
 
         Returns:
             `result.json` payload.
@@ -117,8 +153,9 @@ class BatchRunner:
                 skill_names=skill_names,
                 skill_entries=skill_entries,
                 codebuddy_executable="codebuddy",
+                model=model_request.id,
                 use_container_sandbox=True,
-                env=_default_codebuddy_env(case_layout=case_layout),
+                env=_default_codebuddy_env(case_layout=case_layout, model_request=model_request),
             )
             runner_result = self._runner.run_case(target=target, case=case, workspace_dir=sandbox.root)
             session_missing = _copy_session_raw(
@@ -133,6 +170,7 @@ class BatchRunner:
                 case_layout=case_layout,
                 runner_result=runner_result,
                 duration_ms=_elapsed_ms(case_started_perf),
+                model_request=model_request,
                 missing_evidence=[*session_missing, *([f"sandbox_cleanup_failed: {item}" for item in cleanup_errors])],
             )
         except Exception as exc:
@@ -144,6 +182,7 @@ class BatchRunner:
                 duration_ms=_elapsed_ms(case_started_perf),
                 error=exc,
                 cleanup_errors=cleanup_errors,
+                model_request=model_request,
             )
 
         write_json(case_layout.result_json, result_payload)
@@ -157,6 +196,7 @@ class BatchRunner:
         case_layout: CaseArtifactLayout,
         runner_result: HeadlessRunResult,
         duration_ms: int,
+        model_request: RuntimeModelRequest,
         missing_evidence: list[str],
     ) -> dict[str, Any]:
         """Build the successful or runner-failed result payload.
@@ -167,6 +207,7 @@ class BatchRunner:
             case_layout: Case result paths.
             runner_result: CodeBuddy run result.
             duration_ms: Case duration in milliseconds.
+            model_request: Model id and optional config passed to CodeBuddy.
             missing_evidence: Missing evidence labels.
 
         Returns:
@@ -182,6 +223,7 @@ class BatchRunner:
             "verdict": "pass" if score == 1 else "fail",
             "score": score,
             "final_response": runner_result.final_message,
+            "model": _case_model_payload(model_request, observed_model=runner_result.model),
             "metrics": {
                 "duration_ms": duration_ms,
                 "tokens": _normalize_tokens(runner_result.usage),
@@ -203,6 +245,7 @@ class BatchRunner:
         duration_ms: int,
         error: Exception,
         cleanup_errors: list[str],
+        model_request: RuntimeModelRequest,
     ) -> dict[str, Any]:
         """Build a result payload for harness-level failures.
 
@@ -212,6 +255,7 @@ class BatchRunner:
             duration_ms: Case duration in milliseconds.
             error: Raised exception.
             cleanup_errors: Sandbox cleanup errors, if any.
+            model_request: Model id and optional config passed to CodeBuddy.
 
         Returns:
             Failed `result.json` payload.
@@ -228,6 +272,7 @@ class BatchRunner:
             "verdict": "fail",
             "score": 0,
             "final_response": str(error),
+            "model": _case_model_payload(model_request, observed_model=None),
             "metrics": {
                 "duration_ms": duration_ms,
                 "tokens": {"input": None, "output": None, "total": None},
@@ -267,11 +312,16 @@ class BatchRunner:
         return results
 
 
-def _default_codebuddy_env(*, case_layout: CaseArtifactLayout) -> dict[str, str]:
+def _default_codebuddy_env(
+    *, case_layout: CaseArtifactLayout, model_request: RuntimeModelRequest | None = None
+) -> dict[str, str]:
     """Return eval-safe environment variables for the CodeBuddy process.
 
     Args:
         case_layout: Public and internal paths for the current case.
+        model_request: Optional batch-level model request. When it includes a
+            suite ``models.json``, the file is copied into CodeBuddy's isolated
+            config directory before the child process starts.
 
     Returns:
         Minimal environment overrides. CodeBuddy state is written under the
@@ -283,6 +333,8 @@ def _default_codebuddy_env(*, case_layout: CaseArtifactLayout) -> dict[str, str]
 
     codebuddy_config_dir = case_layout.codebuddy_config_dir
     codebuddy_config_dir.mkdir(parents=True, exist_ok=True)
+    if model_request and model_request.config_file:
+        copy_model_config_file(source=model_request.config_file, destination_dir=codebuddy_config_dir)
     env = {
         "PYTHONIOENCODING": "utf-8",
         # Force UTF-8 at the Python level so CodeBuddy's own subprocesses are
@@ -298,6 +350,8 @@ def _default_codebuddy_env(*, case_layout: CaseArtifactLayout) -> dict[str, str]
         "NO_PROXY": "localhost,127.0.0.1,::1",
         "no_proxy": "localhost,127.0.0.1,::1",
     }
+    if model_request and model_request.config_file:
+        env["CODEBUDDY_DISABLE_BUILTIN_MODELS"] = "1"
     env.update(_load_feishu_credentials())
     return env
 
@@ -494,6 +548,105 @@ def cleanup_internal_dir(path: Path) -> None:
     """
 
     remove_sandbox(path)
+
+
+def _build_runtime_model_request(
+    *, suite_model: SuiteModelConfig | None, override_model: str | None
+) -> RuntimeModelRequest:
+    """Resolve the batch-level model request.
+
+    Args:
+        suite_model: Optional model block from ``suite.yaml``.
+        override_model: Optional CLI override. It changes only the requested
+            model id; a suite ``config_file`` still applies and must define the
+            overridden id.
+
+    Returns:
+        RuntimeModelRequest used by every case in the batch.
+
+    Raises:
+        ValueError: If a suite model config file does not define the effective
+            model id.
+    """
+
+    cli_model = _normalize_requested_model(override_model)
+    requested_id = cli_model or (suite_model.id if suite_model else None)
+    config_file = suite_model.config_file if suite_model else None
+    if config_file and requested_id:
+        validate_model_config_file(config_file=config_file, model_id=requested_id)
+    fingerprint = fingerprint_model_config_file(config_file) if config_file else None
+    return RuntimeModelRequest(id=requested_id, config_file=config_file, config_fingerprint=fingerprint)
+
+
+def _batch_model_payload(model_request: RuntimeModelRequest) -> dict[str, Any]:
+    """Build the batch-level model evidence payload.
+
+    Args:
+        model_request: Resolved batch-level model request.
+
+    Returns:
+        JSON-ready model payload for ``batch.json``. The ``config`` field is
+        present only when the suite supplied a custom ``models.json``.
+    """
+
+    payload: dict[str, Any] = {"requested": model_request.id}
+    config_payload = _model_config_payload(model_request)
+    if config_payload is not None:
+        payload["config"] = config_payload
+    return payload
+
+
+def _case_model_payload(model_request: RuntimeModelRequest, *, observed_model: str | None) -> dict[str, Any]:
+    """Build the case-level model evidence payload.
+
+    Args:
+        model_request: Resolved batch-level model request.
+        observed_model: Model id or name recovered from CodeBuddy evidence.
+
+    Returns:
+        JSON-ready model payload for ``result.json``.
+    """
+
+    payload: dict[str, Any] = {"requested": model_request.id, "observed": observed_model}
+    config_payload = _model_config_payload(model_request)
+    if config_payload is not None:
+        payload["config"] = config_payload
+    return payload
+
+
+def _model_config_payload(model_request: RuntimeModelRequest) -> dict[str, str] | None:
+    """Build public evidence for a custom model config file.
+
+    Args:
+        model_request: Resolved batch-level model request.
+
+    Returns:
+        Small config evidence payload, or None when no suite config file is
+        used. The source file path and API key are intentionally omitted.
+    """
+
+    if not model_request.config_file:
+        return None
+    return {
+        "source": "suite_config_file",
+        "fingerprint": model_request.config_fingerprint or "",
+    }
+
+
+def _normalize_requested_model(model: str | None) -> str | None:
+    """Normalize the optional batch-level model id.
+
+    Args:
+        model: Raw model id from the CLI or caller.
+
+    Returns:
+        Cleaned model id, or None when the caller wants CodeBuddy's default.
+    """
+
+    if model is None:
+        return None
+    cleaned = model.strip()
+    return cleaned or None
 
 
 def _build_case_counts(case_payloads: list[dict[str, Any]]) -> dict[str, int]:

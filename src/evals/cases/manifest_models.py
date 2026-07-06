@@ -105,6 +105,7 @@ class TargetConfig(BaseModel):
         skill_names: Skill names visible in the sandbox.
         skill_entries: Explicit fallback paths to sandbox `SKILL.md` files.
         codebuddy_executable: CLI executable name.
+        model: Optional CodeBuddy model id for this run.
         use_container_sandbox: Whether CodeBuddy should run the case inside a Docker-backed sandbox. Docker is the default isolation boundary.
         env: Extra environment variables for the CodeBuddy process.
 
@@ -117,8 +118,26 @@ class TargetConfig(BaseModel):
     skill_names: list[str] = Field(default_factory=list)
     skill_entries: list[str] = Field(default_factory=list)
     codebuddy_executable: str = "codebuddy"
+    model: str | None = None
     use_container_sandbox: bool = True
     env: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("model", mode="before")
+    @classmethod
+    def normalize_model(cls, value: object) -> str | None:
+        """Normalize the optional CodeBuddy model id.
+
+        Args:
+            value: Raw model value from the CLI or a test target.
+
+        Returns:
+            Cleaned model id, or None when no model was requested.
+        """
+
+        if value is None:
+            return None
+        cleaned = str(value).strip()
+        return cleaned or None
 
     @property
     def skill_name(self) -> str:
@@ -147,11 +166,52 @@ class TargetConfig(BaseModel):
         return self.skill_entries[0] if self.skill_entries else None
 
 
+class SuiteModelConfig(BaseModel):
+    """Suite-level model selection.
+
+    Args:
+        id: CodeBuddy model id requested for every case in this suite.
+        config_file: Optional local ``models.json`` file. When present, the
+            runner copies it into each isolated CodeBuddy config directory so
+            the requested model uses that configuration instead of relying on
+            host-global state.
+
+    Returns:
+        SuiteModelConfig instance attached to the manifest.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    id: str
+    config_file: Path | None = None
+
+    @field_validator("id")
+    @classmethod
+    def validate_model_id(cls, value: str) -> str:
+        """Validate the requested CodeBuddy model id.
+
+        Args:
+            value: Raw model id from ``suite.yaml``.
+
+        Returns:
+            Cleaned model id.
+
+        Raises:
+            ValueError: If the id is empty.
+        """
+
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("model.id cannot be empty")
+        return cleaned
+
+
 class EvalSuiteManifest(BaseModel):
     """Loaded eval suite manifest.
 
     Args:
         suite_id: Suite identifier.
+        model: Optional suite-level CodeBuddy model configuration.
         graders: Grader ids to execute for every case.
         cases: Resolved case folders.
         source_path: Absolute path to `suite.yaml`.
@@ -163,6 +223,7 @@ class EvalSuiteManifest(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     suite_id: str
+    model: SuiteModelConfig | None = None
     graders: list[str] = Field(min_length=1)
     cases: list[EvalCase] = Field(min_length=1)
     source_path: Path | None = None

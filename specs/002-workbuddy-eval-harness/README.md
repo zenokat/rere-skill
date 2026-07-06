@@ -15,7 +15,9 @@
 
 ## 基本概念
 
-一次评测由一个 suite 文件夹组成：
+一次评测由一个 suite 文件夹组成。有两种组织方式：
+
+**方式一：case 级自包含（适合少量、差异大的 case）**
 
 ```text
 revenue-recognition-real-smoke/
@@ -32,19 +34,35 @@ revenue-recognition-real-smoke/
             └── 收银汇总表 202605.xlsx
 ```
 
+**方式二：suite 级共享资源（适合大量 case 共用同一套 skill 和 input）**
+
+当多条 case 使用相同的 skill 包和输入文件时，可以在 `suite.yaml` 中声明 suite 级共享路径，避免在每个 case 里重复放置。case 级 `skills/` 和 `input/` 为空目录即可，harness 会自动回退到 suite 级路径。
+
+```text
+Rollup_Core_20260630/
+├── suite.yaml              # 声明 suite 级 input 和 skills 路径
+└── cases/
+    └── dine_in_revenue_202605/
+        ├── instruction.md
+        ├── skills/        # 空目录，回退到 suite 级
+        └── input/          # 空目录，回退到 suite 级
+```
+
 每个 case 文件夹就是一份完整的评测材料：
 
 | 路径 | 含义 |
 |---|---|
 | `instruction.md` | 发给 Agent 的任务说明。这里写真实用户请求、边界和必要提示。 |
-| `skills/` | 本 case 提供给 Agent 的 skill 包。 |
-| `input/` | 本 case 允许 Agent 读取的输入文件。 |
+| `skills/` | 本 case 提供给 Agent 的 skill 包。为空且 suite 级有 `skills` 声明时，自动回退。 |
+| `input/` | 本 case 允许 Agent 读取的输入文件。为空且 suite 级有 `input` 声明时，自动回退。 |
 
 不要在 case 里引用开发仓库绝对路径，不要要求 Agent 读取仓库根目录。case 应该像一个可搬走的包，离开原始代码仓库也能被放进隔离环境运行。
 
 ## suite.yaml
 
-`suite.yaml` 只描述这批评测包含哪些 case，以及用哪些 grader 判分。
+`suite.yaml` 描述这批评测包含哪些 case、用哪些 grader 判分，以及可选的 suite 级共享资源路径。
+
+**最小示例（case 级自包含）：**
 
 ```yaml
 suite_id: revenue-recognition-real-smoke
@@ -54,13 +72,37 @@ cases:
   - revenue-recognition-dine-in-202605
 ```
 
-| 字段 | 含义 |
-|---|---|
-| `suite_id` | 评测集 ID，用来区分不同评测批次。 |
-| `graders` | 本批评测要运行的评分器。所有 grader 都只返回 `0` 或 `1`。 |
-| `cases` | case 文件夹名列表。harness 会读取 `cases/<case_id>/`。 |
+**带 suite 级共享资源的示例：**
 
-case 的 skill、输入和任务说明不再写在 YAML 里，而是放在 case 文件夹里。
+```yaml
+suite_id: Rollup_Core_20260630
+model:
+  id: glm-5
+  config_file: ${EVAL_MODELS_JSON}
+graders:
+  - preview_file_exists
+  - preview_matches_baseline
+input: d:/AI/rere-agent/202605-source-excel
+skills: d:/AI/rere-agent/skill/revenue-recognition
+cases:
+  - dine_in_revenue_202605
+  - eleme_delivery_revenue_202605
+```
+
+| 字段 | 必填 | 含义 |
+|---|---|---|
+| `suite_id` | 是 | 评测集 ID，用来区分不同评测批次。 |
+| `model` | 否 | suite 级模型选择。首版一个 suite 只指定一个模型。 |
+| `model.id` | `model` 存在时必填 | CodeBuddy 模型 ID，会传给 `codebuddy --model`。 |
+| `model.config_file` | 否 | CodeBuddy `models.json` 路径。支持绝对路径、相对 suite.yaml 的相对路径，以及 `${ENV_VAR}`。声明后 harness 会复制到每条 case 的隔离 CodeBuddy 配置目录。 |
+| `graders` | 是 | 本批评测要运行的评分器。所有 grader 都只返回 `0` 或 `1`。 |
+| `cases` | 是 | case 文件夹名列表。harness 会读取 `cases/<case_id>/`。 |
+| `input` | 否 | suite 级共享输入文件目录的绝对路径或相对路径（相对于 suite.yaml 所在目录）。当 case 级 `input/` 为空时，harness 自动回退到此目录。 |
+| `skills` | 否 | suite 级共享 skill 目录的绝对路径或相对路径（相对于 suite.yaml 所在目录）。当 case 级 `skills/` 为空时，harness 自动回退到此目录。 |
+
+case 的 skill、输入和任务说明不再写在 YAML 里，而是放在 case 文件夹里（或通过 suite 级共享路径统一提供）。
+
+如果声明了 `model.config_file`，该文件必须定义 `model.id`。否则 harness 会在加载 suite 时直接失败，避免你以为走自定义 API，实际回退到 CodeBuddy 内置模型。公开结果只记录配置指纹，不记录本机路径、文件内容或 API key。
 
 ## 隔离运行
 
@@ -73,10 +115,11 @@ case 的 skill、输入和任务说明不再写在 YAML 里，而是放在 case 
 3. 在 workspace 内创建 `output/`，作为业务产物的唯一约定写入位置。
 4. 把 `skills/<skill-name>/` 安装成接近 WorkBuddy 的加载结构：`.workbuddy/skills/<skill-name>/`。
 5. 将 WorkBuddy 风格的 `system-reminder` 上下文和 `instruction.md` 中的用户请求作为首条用户消息发给 CodeBuddy。
-6. 以 sandbox workspace 作为 CodeBuddy 的工作区运行 `codebuddy -p ...`。
-7. 收集 session、最终回答、grader 结果和 `output/` 文件。
-8. 把证据写入结果目录。
-9. 销毁 sandbox workspace。
+6. 如果 suite 声明了 `model.config_file`，把该 `models.json` 复制到隔离的 CodeBuddy 配置目录。
+7. 以 sandbox workspace 作为 CodeBuddy 的工作区运行 `codebuddy -p ...`。
+8. 收集 session、最终回答、grader 结果和 `output/` 文件。
+9. 把证据写入结果目录。
+10. 销毁 sandbox workspace。
 
 CodeBuddy 面对的 workspace 形态固定为：
 
@@ -104,7 +147,7 @@ CodeBuddy 面对的 workspace 形态固定为：
 
 harness 使用 Docker/OCI 容器作为默认安全边界。运行时 CodeBuddy CLI 以当前 sandbox workspace 为 cwd，并启用 `--sandbox container --sandbox-new --sandbox-kill`；容器只应看到当前 case workspace，不能挂载原始代码仓库或用户主目录。CodeBuddy 权限参数只作为辅助护栏和 session 取证信号，不再承担主要隔离职责。
 
-CodeBuddy CLI 自己的会话历史、日志和缓存写入独立的内部 `codebuddy-state/` 目录，不放进 case workspace。这样业务 sandbox 只承载 `input/`、`output/` 和 `.workbuddy/`，状态缓存清理失败也不会被误判为业务证据缺失。
+CodeBuddy CLI 自己的会话历史、日志、模型配置副本和缓存写入独立的内部 `codebuddy-state/` 目录，不放进 case workspace。这样业务 sandbox 只承载 `input/`、`output/` 和 `.workbuddy/`，状态缓存清理失败也不会被误判为业务证据缺失。
 
 如果 CodeBuddy CLI、登录状态、Docker、容器网络或必要运行时缺失，这条 case 应该判为环境失败，并写入 `result.json`，而不是退回到非 sandbox workspace 裸跑。
 
@@ -189,6 +232,8 @@ codex -C D:\AI\rere-agent --sandbox danger-full-access
   --output_root .tmp/evals/revenue-real-smoke
 ```
 
+正式评测建议把模型写在 suite.yaml 的 `model` 字段。`--model <model-id>` 只作为临时覆盖入口；如果 suite 同时声明了 `model.config_file`，覆盖后的模型 ID 也必须存在于该配置文件中。
+
 命令执行后，stdout 只需要返回：
 
 ```json
@@ -242,6 +287,13 @@ codex -C D:\AI\rere-agent --sandbox danger-full-access
 {
   "batch_id": "20260627-130214-revenue-recognition-real-smoke",
   "suite_id": "revenue-recognition-real-smoke",
+  "model": {
+    "requested": "glm-5",
+    "config": {
+      "source": "suite_config_file",
+      "fingerprint": "sha256:9d3f0c9a2c4b7e11"
+    }
+  },
   "status": "passed",
   "case_counts": {
     "total": 1,
@@ -269,6 +321,8 @@ codex -C D:\AI\rere-agent --sandbox danger-full-access
 | 字段 | 判断方式 |
 |---|---|
 | `status` | 整批是否通过。 |
+| `model.requested` | 本批请求的 CodeBuddy 模型；为 `null` 时表示使用默认模型。 |
+| `model.config` | 只在使用 suite `model.config_file` 时出现；记录配置来源和指纹，不记录 API key。 |
 | `case_counts.total` | 本轮总 case 数。 |
 | `case_counts.completed` | 完成运行、取证和评分的 case 数。 |
 | `case_counts.passed` / `case_counts.failed` | 有多少 case 被 grader 判为通过或失败。 |
@@ -286,6 +340,14 @@ codex -C D:\AI\rere-agent --sandbox danger-full-access
   "verdict": "pass",
   "score": 1,
   "final_response": "已完成 202605 堂食收入汇总 preview，未执行 upload。",
+  "model": {
+    "requested": "glm-5",
+    "observed": "glm-5",
+    "config": {
+      "source": "suite_config_file",
+      "fingerprint": "sha256:9d3f0c9a2c4b7e11"
+    }
+  },
   "metrics": {
     "duration_ms": 48231,
     "tokens": {
@@ -324,9 +386,10 @@ codex -C D:\AI\rere-agent --sandbox danger-full-access
 1. 看 `status`：这条 case 是否完成运行。
 2. 看 `verdict` 和 `score`：grader 是否判定通过。`score` 只会是 `1` 或 `0`。
 3. 看 `final_response`：模型最终回答是什么。
-4. 看 `graders[].summary`：每个 grader 为什么给 `1` 或 `0`。
-5. 看 `evidence.missing`：证据是否缺失。
-6. 看 `outputs/`：业务产物是否真的存在。
+4. 看 `model.requested` / `model.observed`：请求模型和实际采到的模型是否一致；如果使用自定义模型配置，再看 `model.config.fingerprint` 是否存在。
+5. 看 `graders[].summary`：每个 grader 为什么给 `1` 或 `0`。
+6. 看 `evidence.missing`：证据是否缺失。
+7. 看 `outputs/`：业务产物是否真的存在。
 
 ## session.jsonl 怎么看
 
@@ -370,7 +433,15 @@ grader 只做 0/1 二元判断。`suite.yaml` 里写了哪些 grader，本批评
 ```yaml
 graders:
   - preview_file_exists
+  - preview_matches_baseline
 ```
+
+当前可用的评分器：
+
+| grader ID | 判断逻辑 |
+|---|---|
+| `preview_file_exists` | 检查 `outputs/` 中是否存在本次评测产出的 preview 文件。只要文件存在且非空就给 `1`，否则给 `0`。适合作为最低通过门槛。 |
+| `preview_matches_baseline` | 从 `outputs/` 的 preview Excel 中提取结果行，与飞书 baseline 记录逐行逐字段比对。完全一致给 `1`，有任何差异给 `0` 并在 evidence 中报告差异类型、差异数量和样本。需要运行环境能访问飞书 API。 |
 
 每个 grader 写回 `result.json.graders[]`：
 
@@ -425,7 +496,9 @@ grader 可以评很多东西：`outputs/` 文件、`result.json`、`session.json
 - 每条 case 以一次性本地 sandbox 作为 CodeBuddy workspace，结束后销毁 sandbox。
 - CodeBuddy 的 case workspace 不包含原始代码仓库或用户主目录。
 - case 以文件夹组织，包含 `instruction.md`、`skills/` 和 `input/`。
-- suite YAML 包含 `suite_id`、`graders` 和 `cases`。
+- suite YAML 包含 `suite_id`、`graders`、`cases`，可选 `model` 指定 suite 级模型，可选 `input` 和 `skills` 用于 suite 级共享资源。
+- 如果 suite 声明 `model.config_file`，harness 必须把该模型配置复制到隔离 CodeBuddy 配置目录，并在模型 ID 不存在时失败。
+- 当 case 级 `input/` 或 `skills/` 为空时，harness 自动回退到 suite 级共享路径。
 - sandbox 中的 skill 加载方式尽量还原 WorkBuddy 的 `.workbuddy/skills/<skill-name>/`。
 - 启动上下文尽量还原 WorkBuddy 的 `system-reminder` 形态，但不覆盖 CodeBuddy CLI 自带 system prompt。
 - 每条 case 输出 `result.json`、`session.jsonl` 和 `outputs/`。

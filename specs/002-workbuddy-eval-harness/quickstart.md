@@ -16,6 +16,7 @@ npm install -g @tencent-ai/codebuddy-code
 codebuddy --version
 codebuddy
 codebuddy -p "hello" --output-format json
+codebuddy -p "hello" --model <model-id> --output-format json
 ```
 
 如果最小无头调用不能返回模型结果，先处理 CodeBuddy 安装、PATH、登录或权限问题。
@@ -54,10 +55,22 @@ specs/002-workbuddy-eval-harness/examples/revenue-recognition-real-smoke/
 
 ```yaml
 suite_id: revenue-recognition-real-smoke
+model:
+  id: glm-5
+  config_file: ${EVAL_MODELS_JSON}
 graders:
   - preview_file_exists
+  - preview_matches_baseline
 cases:
   - revenue-recognition-dine-in-202605
+```
+
+> `model` 是可选字段。只指定 `model.id` 时使用 CodeBuddy 当前可用模型；同时指定 `model.config_file` 时，harness 会把该 `models.json` 复制到每条 case 的隔离 CodeBuddy 配置目录，并要求文件内必须定义该模型。`input` 和 `skills` 是可选字段，用于声明 suite 级共享路径。当 case 级目录为空时，harness 自动回退。详见 [README](./README.md#suiteyaml)。
+
+如果使用 `${EVAL_MODELS_JSON}`，先在当前 PowerShell 会话设置：
+
+```powershell
+$env:EVAL_MODELS_JSON = "$env:USERPROFILE\.workbuddy\models.json"
 ```
 
 `instruction.md` 写真实任务，例如：
@@ -82,6 +95,8 @@ Requirements:
   --output_root .tmp/evals/revenue-real-smoke
 ```
 
+正式评测建议把模型写在 suite.yaml。`--model <model-id>` 只作为临时覆盖入口；如果 suite 同时声明了 `model.config_file`，覆盖后的模型 ID 也必须存在于该配置文件中。
+
 ## 5. 查看结果
 
 先看批次：
@@ -102,7 +117,10 @@ Get-ChildItem .tmp/evals/revenue-real-smoke/<batch_id>/cases/revenue-recognition
 
 - `batch.json.case_counts.total` 等于评测集 case 数。
 - `batch.json.case_counts.completed` 等于已完成运行、取证和评分的 case 数。
+- `batch.json.model.requested` 能看到本批请求的模型；没有指定时为 `null`。
+- 如果使用 suite `model.config_file`，`batch.json.model.config.fingerprint` 能看到本次复制的配置文件指纹，但不会看到 API key。
 - `result.json.score` 是 `1` 或 `0`。
+- `result.json.model.observed` 能看到 session 或 stdout 里实际采到的模型；采不到时为 `null`。
 - `result.json.graders[]` 能看到 0/1 评分原因。
 - `session.jsonl` 能看到 Agent 可见行为轨迹。
 - `session.jsonl` 是原始敏感证据，可能包含环境变量、凭据片段、绝对路径和 provider 细节；只在本地复盘或受控归档中使用。

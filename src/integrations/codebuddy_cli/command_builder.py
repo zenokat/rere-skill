@@ -180,6 +180,8 @@ class CodeBuddyCommandBuilder:
             if allowed_tools:
                 args.extend(["--allowedTools", " ".join(allowed_tools)])
         args.extend(["--disallowedTools", "Agent"])
+        if target.model:
+            args.extend(["--model", target.model])
         args.extend(["-p", "--output-format", OutputFormat.JSON.value])
         return CodeBuddyCommand(
             args=args,

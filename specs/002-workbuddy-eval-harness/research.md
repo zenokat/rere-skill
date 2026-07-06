@@ -2,7 +2,7 @@
 
 ## R1: 评测输入形式
 
-- **Decision**: 评测集由 suite YAML + case 文件夹组成。suite YAML 只包含 `suite_id`、`graders` 和 `cases`；每条 case 的任务、skill 和输入文件放在 case 文件夹中。
+- **Decision**: 评测集由 suite YAML + case 文件夹组成。suite YAML 包含 `suite_id`、`graders`、`cases`，并允许 suite 级 `model` 与共享 `input`/`skills`；每条 case 的任务、skill 和输入文件放在 case 文件夹中。
 - **Rationale**: 评测者需要清楚控制 Agent 能看到什么。把 prompt、skill 路径和 input 都塞进 YAML 会让 case 难以审查，也容易泄露开发仓库路径。
 - **Implication**: 旧的 `skill.path`、`skill.name`、`cases[].prompt` 从用户契约中移除。
 
