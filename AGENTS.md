@@ -50,6 +50,23 @@ at specs/002-workbuddy-eval-harness/plan.md
 
 ## git提交要求
 - 使用中文
+- 提交前先确认目标分支；与某个 feature/spec 强相关的改动，应提交到对应分支，不要误落到 `main`。
+- 提交摘要保持方括号标签开头，用标签表达改动领域，例如 `[eval]`、`[skills]`、`[docs]`、`[fix]`、 `[某branch名]`。
+- 单次提交横跨多个领域时，连续使用多个标签，例如 `[eval][docs] 新增评测集并更新 README`。
+- 提交前只 stage 本次任务相关文件；保留用户已有的未提交改动，不要顺手带入无关删除、未跟踪评测集或临时产物。
+
+### 标签语义约定
+标签按含义分为三类，混用时注意区分：
+
+- **领域标签**：描述改动涉及的项目子系统。
+  - `[eval]` -- eval-harness 评测框架（runner、grader、sandbox、manifest、评测集）。
+  - `[skills]` -- 项目推进过程中沉淀下来的 skill 产出物（SKILL.md、脚本、skill 目录结构），**不是**指项目业务对象（如收入确认 skill）。
+  - `[context]` -- 上下文层面的调整（AGENTS.md、CLAUDE.md、environment.md、git 规范等），不涉及记录业务逻辑的speckit文档。
+- **行为标签**：描述改动的性质。
+  - `[fix]` -- 修复已有 bug。
+  - `[chore]` -- 杂务（.gitignore、依赖更新、CI 配置等）。
+  - `[refactor]` -- 重构，行为不变。
+- **分支标签**：已淘汰不再使用，如 `[002-workbuddy-eval-harness]`。
 
 ## Build for Agents
 项目中构建的skill、eval harness等均视Agent为主要用户（记得你自己就是Agent）
