@@ -15,7 +15,7 @@
 
 ## Requirement Completeness
 
-- [x] Minimal suite YAML is defined.
+- [x] Minimal suite YAML is defined (supports optional `input`/`skills` shared paths).
 - [x] Case folder layout is defined.
 - [x] Per-case sandbox lifecycle is defined.
 - [x] Skill materialization layout follows observed WorkBuddy skill loading shape.

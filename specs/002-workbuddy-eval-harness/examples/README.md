@@ -24,6 +24,8 @@ revenue-recognition-real-smoke/
         └── input/
 ```
 
+> 对于多条 case 共用同一套 skill 和 input 的场景，可在 `suite.yaml` 中声明 suite 级 `input`/`skills` 共享路径，case 级目录留空即可，harness 会自动回退。详见 [README](../../README.md#suiteyaml)。
+
 本 case 的目标是：只执行堂食收入 202605 的 validate 和 preview，不执行 upload。评分器为 `preview_file_exists`，检查 `outputs/` 中是否出现本次 preview 文件。
 
 预期结果文件：
