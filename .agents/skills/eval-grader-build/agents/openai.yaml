@@ -1,0 +1,4 @@
+interface:
+  display_name: "Eval Grader Build"
+  short_description: "Build and validate eval harness graders"
+  default_prompt: "Use $eval-grader-build to add or improve an eval harness grader, then validate it with tests and one real smoke case."

@@ -16,6 +16,7 @@ from typing import Any
 
 from evals.cases.case_selector import select_cases
 from evals.cases.manifest_models import EvalCase, EvalSuiteManifest, TargetConfig
+from evals.graders.preview_matches_baseline import grade_preview_matches_baseline
 from evals.graders.preview_file_exists import grade_preview_file_exists
 from evals.reports.serializers import write_json
 from evals.sandbox.case_sandbox import CaseSandboxBuilder, copy_outputs_to_result, remove_sandbox
@@ -258,6 +259,9 @@ class BatchRunner:
         for grader_id in manifest.graders:
             if grader_id == "preview_file_exists":
                 results.append(grade_preview_file_exists(outputs_dir=case_layout.outputs_dir))
+                continue
+            if grader_id == "preview_matches_baseline":
+                results.append(grade_preview_matches_baseline(outputs_dir=case_layout.outputs_dir))
                 continue
             raise ValueError(f"unknown grader: {grader_id}")
         return results
