@@ -3,12 +3,12 @@ model:
   id: deepseek-v4-pro
   config_file: ${EVAL_MODELS_JSON}
 graders:
-  - preview_file_exists
-  - preview_matches_baseline
-  - skill_script_called:list_recog_items
-  - skill_script_called:run_recog_rollup
-  - skill_script_args:run_recog_rollup:--validate
-  - skill_script_args:run_recog_rollup:--preview
+  - "preview_file_exists"
+  - "preview_matches_baseline"
+  - "skill_script_called:list_recog_items"
+  - "skill_script_called:run_recog_rollup"
+  - "skill_script_args:run_recog_rollup:--validate"
+  - "skill_script_args:run_recog_rollup:--preview"
 input: d:/AI/rere-agent/202605-source-excel
 skills: d:/AI/rere-agent/skill
 cases:

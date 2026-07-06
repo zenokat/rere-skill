@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,10 +48,17 @@ class PreviewStageImpl:
     def run(self, recog_id: str, period: str, source_file: Path) -> PreviewSuccessResponse:
         """执行试算。"""
 
+        print(f"[preview] Starting preview for {recog_id} (period={period})...", file=sys.stderr, flush=True)
+
         source_files = discover_source_files(source_file)
+        print(f"[preview] Discovered {len(source_files)} source file(s).", file=sys.stderr, flush=True)
+
+        print("[preview] Loading rule bundle (Feishu API, 2 calls)...", file=sys.stderr, flush=True)
         rule_bundle = ensure_rule_bundle_supported(
             apply_project_patches(self._rule_repository.load_rule_bundle(recog_id))
         )
+        print(f"[preview] Rule bundle loaded: {len(rule_bundle.rollup_rules)} rules, {len(rule_bundle.source_sheets)} source specs.", file=sys.stderr, flush=True)
+
         group_rules = self._dedupe_output_rules([rule for rule in rule_bundle.rollup_rules if rule.type == "GROUP"])
         sum_rules = [rule for rule in rule_bundle.rollup_rules if rule.type == "SUM"]
         group_fields = [rule.bitable_field for rule in group_rules]
@@ -59,7 +67,8 @@ class PreviewStageImpl:
         issues: list[PreviewIssue] = []
         load_cache = SourceFileLoadCache()
 
-        for current_file in source_files:
+        for file_index, current_file in enumerate(source_files, start=1):
+            print(f"[preview] Processing file {file_index}/{len(source_files)}: {current_file.name}...", file=sys.stderr, flush=True)
             for source_spec in rule_bundle.source_sheets:
                 try:
                     dataset = build_sheet_dataset(
@@ -174,9 +183,13 @@ class PreviewStageImpl:
             )
 
         records = list(aggregates.values())
+        print(f"[preview] Aggregating {len(records)} group records...", file=sys.stderr, flush=True)
         normalized_records = self._normalize_and_merge_group_records(records, group_fields)
         ordered_records = self._order_records(records=normalized_records, group_fields=group_fields, sum_rules=sum_rules)
+
+        print("[preview] Writing output artifact...", file=sys.stderr, flush=True)
         artifact = self._artifact_writer.write(recog_id=recog_id, period=period, records=ordered_records, group_fields=group_fields)
+        print(f"[preview] Preview complete: {artifact.row_count} rows, {artifact.field_count} fields -> {artifact.result_file}", file=sys.stderr, flush=True)
         return PreviewSuccessResponse(
             recog_id=recog_id,
             period=period,

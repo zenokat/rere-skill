@@ -26,7 +26,7 @@ from models.domain import RecognitionProject, UploadStrategy
 class ValidationStage(Protocol):
     """结构检验阶段协议。"""
 
-    def run(self, recog_id: str, source_file: Path) -> ValidateSuccessResponse:
+    def run(self, recog_id: str, source_file: Path, *, project: RecognitionProject | None = None) -> ValidateSuccessResponse:
         """执行结构检验。"""
 
 
@@ -88,7 +88,7 @@ class RunRecogRollupService:
 
         project = self._require_project(recog_id)
         self._require_target_table(project)
-        self._validation_stage.run(recog_id=recog_id, source_file=source_file)
+        self._validation_stage.run(recog_id=recog_id, source_file=source_file, project=project)
         preview_response = self._preview_stage.run(recog_id=recog_id, period=period, source_file=source_file)
         return self._upload_stage.run(
             recog_id=recog_id,
@@ -101,7 +101,7 @@ class RunRecogRollupService:
 
         project = self._require_project(recog_id)
         self._require_target_table(project)
-        return self._validation_stage.run(recog_id=recog_id, source_file=source_file)
+        return self._validation_stage.run(recog_id=recog_id, source_file=source_file, project=project)
 
     def run_preview(self, recog_id: str, period: str, source_file: Path) -> PreviewSuccessResponse:
         """只执行试算。"""

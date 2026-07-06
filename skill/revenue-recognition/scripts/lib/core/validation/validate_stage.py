@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from core.catalog.project_catalog_repository import ProjectCatalogRepository
@@ -29,7 +30,7 @@ from models.cli_results import (
     ValidateSuccessResponse,
     ValidationCheckResult,
 )
-from models.domain import RuleBundle
+from models.domain import RecognitionProject, RuleBundle
 from utils.settings import AppSettings
 
 PERIOD_FIELD_NAME = "期间"
@@ -66,15 +67,26 @@ class ValidateStageImpl:
         self._bitable_client = bitable_client
         self._settings = settings
 
-    def run(self, recog_id: str, source_file: Path) -> ValidateSuccessResponse:
+    def run(self, recog_id: str, source_file: Path, *, project: RecognitionProject | None = None) -> ValidateSuccessResponse:
         """执行结构检验。"""
 
+        print(f"[validate] Starting validation for {recog_id}...", file=sys.stderr, flush=True)
+
         source_files = discover_source_files(source_file)
+        print(f"[validate] Discovered {len(source_files)} source file(s).", file=sys.stderr, flush=True)
+
         sampled_source_file = choose_validation_sample(source_files=source_files, seed_key=f"{recog_id}:{source_file}")
+        print(f"[validate] Sampling: {sampled_source_file.name}", file=sys.stderr, flush=True)
+
+        print("[validate] Loading rule bundle (Feishu API, 2 calls)...", file=sys.stderr, flush=True)
         rule_bundle = ensure_rule_bundle_supported(
             apply_project_patches(self._rule_repository.load_rule_bundle(recog_id))
         )
-        project = self._catalog_repository.get_project(recog_id)
+        print(f"[validate] Rule bundle loaded: {len(rule_bundle.rollup_rules)} rules, {len(rule_bundle.source_sheets)} source specs.", file=sys.stderr, flush=True)
+
+        if project is None or not project.bitable_table_id:
+            print("[validate] Loading project info (Feishu API, 2 calls)...", file=sys.stderr, flush=True)
+            project = self._catalog_repository.get_project(recog_id)
         if project is None or not project.bitable_table_id:
             raise CliExecutionError(
                 exit_code=ExitCode.CATALOG_FAILED,
@@ -86,9 +98,14 @@ class ValidateStageImpl:
                 ),
             )
 
+        print("[validate] Validating source sheet specs...", file=sys.stderr, flush=True)
         checks: list[ValidationCheckResult] = []
         checks.extend(self._validate_source_sheet_specs(rule_bundle=rule_bundle, sampled_source_file=sampled_source_file))
+        print("[validate] Source sheet specs validated.", file=sys.stderr, flush=True)
+
+        print("[validate] Fetching target table fields (Feishu API, 1 call)...", file=sys.stderr, flush=True)
         checks.extend(self._validate_target_fields(rule_bundle=rule_bundle, target_table_id=project.bitable_table_id))
+        print("[validate] Validation complete.", file=sys.stderr, flush=True)
 
         error_count = sum(0 if check.passed else 1 for check in checks)
         if error_count:

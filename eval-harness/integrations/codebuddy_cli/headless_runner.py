@@ -77,7 +77,7 @@ class HeadlessRunner(Protocol):
 class CodeBuddyHeadlessRunner:
     """Real CodeBuddy CLI headless runner."""
 
-    def __init__(self, *, timeout_seconds: int = 900) -> None:
+    def __init__(self, *, timeout_seconds: int = 1200) -> None:
         """Initialize the runner.
 
         Args:
