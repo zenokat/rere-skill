@@ -1,6 +1,0 @@
-interface:
-  display_name: "收入确认"
-  short_description: "执行收入确认汇总与受控上传"
-  default_prompt: "使用 $revenue-recognition 执行一个收入确认汇总任务，先确认项目、期间和干净源文件，再运行校验与试算预览。"
-policy:
-  allow_implicit_invocation: true

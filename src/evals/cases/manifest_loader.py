@@ -100,7 +100,7 @@ def _resolve_suite_payload(payload: dict[str, Any], suite_path: Path) -> dict[st
         ManifestLoadError: If unsupported fields or invalid case folders exist.
     """
 
-    allowed_keys = {"suite_id", "graders", "cases"}
+    allowed_keys = {"suite_id", "graders", "cases", "input", "skills"}
     extra_keys = sorted(set(payload) - allowed_keys)
     if extra_keys:
         raise ManifestLoadError(f"unsupported suite field(s): {', '.join(extra_keys)}")
@@ -113,16 +113,54 @@ def _resolve_suite_payload(payload: dict[str, Any], suite_path: Path) -> dict[st
         raise ManifestLoadError("graders must be a non-empty list of grader ids")
 
     cases_root = suite_path.parent / "cases"
-    resolved_cases = [_load_case_folder(cases_root=cases_root, case_id=str(item)) for item in raw_cases]
+
+    # Parse suite-level shared resources.
+    suite_shared_input = _resolve_shared_path(payload, "input", suite_path)
+    suite_shared_skills = _resolve_shared_path(payload, "skills", suite_path)
+
+    resolved_cases = [
+        _load_case_folder(
+            cases_root=cases_root,
+            case_id=str(item),
+            suite_shared_input=suite_shared_input,
+            suite_shared_skills=suite_shared_skills,
+        )
+        for item in raw_cases
+    ]
     return {
         "suite_id": payload.get("suite_id"),
         "graders": raw_graders,
         "cases": resolved_cases,
         "source_path": suite_path,
+        "suite_shared_input": suite_shared_input,
+        "suite_shared_skills": suite_shared_skills,
     }
 
 
-def _load_case_folder(*, cases_root: Path, case_id: str) -> EvalCase:
+def _resolve_shared_path(payload: dict[str, Any], key: str, suite_path: Path) -> Path | None:
+    """Resolve an optional suite-level shared resource path.
+
+    Args:
+        payload: Raw manifest dictionary.
+        key: Field name (``"input"`` or ``"skills"``).
+        suite_path: Absolute path to the suite manifest.
+
+    Returns:
+        Absolute Path if the field is present and non-empty; otherwise None.
+    """
+
+    raw = payload.get(key)
+    if not raw or not isinstance(raw, str):
+        return None
+    resolved = Path(raw)
+    if not resolved.is_absolute():
+        resolved = (suite_path.parent / raw).resolve()
+    if not resolved.is_dir():
+        raise ManifestLoadError(f"suite {key} path does not exist: {raw}")
+    return resolved
+
+
+def _load_case_folder(*, cases_root: Path, case_id: str, suite_shared_input: Path | None = None, suite_shared_skills: Path | None = None) -> EvalCase:
     """Validate and load a single case folder.
 
     Args:
@@ -174,6 +212,8 @@ def _load_case_folder(*, cases_root: Path, case_id: str) -> EvalCase:
         skills_dir=skills_dir,
         input_dir=input_dir,
         instruction=instruction,
+        suite_shared_input=suite_shared_input,
+        suite_shared_skills=suite_shared_skills,
     )
 
 

@@ -228,6 +228,11 @@ class CodeBuddyCommandBuilder:
             "</additional_data>",
             "<memory_and_skills_reminder>",
             "Memory and skill-management reminders are part of the visible WorkBuddy context. In this eval, any file read or write must stay inside the sandbox workspace.",
+            "",
+            "Workspace layout:",
+            "- input/ contains the source files required by this task.",
+            "- output/ is where all task artifacts should be written.",
+            "- .workbuddy/skills/ contains available skill packages with SKILL.md (guidelines) and scripts/ (executable tools).",
             "</memory_and_skills_reminder>",
         ]
         if manually_attached:
@@ -295,8 +300,8 @@ def _workspace_structure(target: TargetConfig) -> str:
         skill_lines.append("        - (none)")
     return "\n".join(
         [
-            "- input/",
-            "- output/",
+            "- input/           -- 本任务所需的源文件",
+            "- output/          -- 本任务的所有产出",
             "- .workbuddy/",
             "  - skills/",
             *skill_lines,

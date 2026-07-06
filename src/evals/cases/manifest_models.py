@@ -26,6 +26,10 @@ class EvalCase(BaseModel):
         skills_dir: Absolute path to `skills/`.
         input_dir: Absolute path to `input/`.
         instruction: User-facing task text from `instruction.md`.
+        suite_shared_input: Absolute path to suite-level shared input
+            directory. Used when the case-level `input/` is empty.
+        suite_shared_skills: Absolute path to suite-level shared skills
+            directory. Used when the case-level `skills/` is empty.
 
     Returns:
         EvalCase instance used by the runner.
@@ -39,6 +43,8 @@ class EvalCase(BaseModel):
     skills_dir: Path
     input_dir: Path
     instruction: str
+    suite_shared_input: Path | None = None
+    suite_shared_skills: Path | None = None
 
     @field_validator("case_id")
     @classmethod
@@ -160,6 +166,8 @@ class EvalSuiteManifest(BaseModel):
     graders: list[str] = Field(min_length=1)
     cases: list[EvalCase] = Field(min_length=1)
     source_path: Path | None = None
+    suite_shared_input: Path | None = None
+    suite_shared_skills: Path | None = None
 
     @field_validator("suite_id")
     @classmethod

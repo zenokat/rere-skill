@@ -62,7 +62,7 @@ class CaseSandboxBuilder:
         sandbox_dir.mkdir(parents=True)
 
         input_dir = sandbox_dir / "input"
-        _copy_tree(case.input_dir, input_dir)
+        _copy_tree(_effective_input_dir(case), input_dir)
 
         output_dir = sandbox_dir / "output"
         output_dir.mkdir()
@@ -71,7 +71,10 @@ class CaseSandboxBuilder:
         workbuddy_skills_dir.mkdir(parents=True)
         skill_entries: list[str] = []
         skill_names: list[str] = []
-        for skill_source in sorted(case.skills_dir.iterdir(), key=lambda path: path.name):
+
+        # Determine the effective skills source: case-level, or suite-level fallback.
+        effective_skills_dir = _effective_skills_dir(case)
+        for skill_source in sorted(effective_skills_dir.iterdir(), key=lambda path: path.name):
             if not skill_source.is_dir():
                 continue
             skill_target = workbuddy_skills_dir / skill_source.name
@@ -89,6 +92,59 @@ class CaseSandboxBuilder:
             skill_entries=skill_entries,
             skill_names=skill_names,
         )
+
+
+def _effective_input_dir(case: EvalCase) -> Path:
+    """Return the effective input source directory for a case.
+
+    When the case-level ``input/`` directory is empty and a suite-level
+    shared input path is available, the shared path is returned instead.
+
+    Args:
+        case: Loaded case folder.
+
+    Returns:
+        Directory path to copy into the sandbox ``input/``.
+    """
+
+    if _dir_is_empty(case.input_dir) and case.suite_shared_input and case.suite_shared_input.is_dir():
+        return case.suite_shared_input
+    return case.input_dir
+
+
+def _effective_skills_dir(case: EvalCase) -> Path:
+    """Return the effective skills source directory for a case.
+
+    When the case-level ``skills/`` directory is empty (no subdirectories)
+    and a suite-level shared skills path is available, the shared path is
+    returned instead.
+
+    Args:
+        case: Loaded case folder.
+
+    Returns:
+        Directory path to copy into the sandbox ``.workbuddy/skills/``.
+    """
+
+    if _dir_is_empty(case.skills_dir) and case.suite_shared_skills and case.suite_shared_skills.is_dir():
+        return case.suite_shared_skills
+    return case.skills_dir
+
+
+def _dir_is_empty(path: Path) -> bool:
+    """Check whether a directory exists but contains no subdirectories.
+
+    Args:
+        path: Directory path to check.
+
+    Returns:
+        True if the directory exists and has no child directories; False
+        otherwise (including when the directory does not exist).
+    """
+
+    if not path.is_dir():
+        return False
+    return not any(child.is_dir() for child in path.iterdir())
 
 
 def copy_outputs_to_result(*, sandbox: CaseSandbox, outputs_dir: Path) -> None:
