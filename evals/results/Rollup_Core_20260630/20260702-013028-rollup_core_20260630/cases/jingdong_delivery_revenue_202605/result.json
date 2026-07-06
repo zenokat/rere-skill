@@ -1,0 +1,46 @@
+{
+  "case_id": "jingdong_delivery_revenue_202605",
+  "evidence": {
+    "missing": [
+      "sandbox_cleanup_failed: workspace: [WinError 32] 另一个程序正在使用此文件，进程无法访问。: 'D:\\\\tmp\\\\rere-agent-eval-sandboxes\\\\20260702-013028-rollup_core_20260630\\\\workspaces\\\\jingdong_delivery_revenu-38e2481e\\\\.workbuddy\\\\skills\\\\scripts'"
+    ],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "校验仍在运行（已约 5.5 分钟，openpyxl 解析 99MB 大文件较慢）。我将停止轮询，等待后台任务完成通知。",
+  "graders": [
+    {
+      "evidence": {
+        "checked_dir": "outputs/"
+      },
+      "id": "preview_file_exists",
+      "score": 0,
+      "summary": "未在 outputs/ 中找到 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "checked_dir": "outputs/"
+      },
+      "id": "preview_matches_baseline",
+      "score": 0,
+      "summary": "未在 outputs/ 中找到 preview 产物，无法做 baseline 对账。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 463214,
+    "tokens": {
+      "input": 41872,
+      "output": 71,
+      "total": 41943
+    }
+  },
+  "score": 0,
+  "status": "completed",
+  "verdict": "fail"
+}

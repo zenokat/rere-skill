@@ -1,0 +1,66 @@
+{
+  "case_id": "alipay_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "汇总完成。202605 支付宝回款已通过 `alipay_settlement` 确认项目跑通 validate + preview 两个阶段。\n\n## 结论\n\n```text\n结论：成功\n阶段：list → validate → preview\n项目：alipay_settlement（支付宝回款）\n期间：202605\n输入：input/支付宝/（7 个支付宝业务汇总查询 CSV）\n产物：output/支付宝回款_202605_汇总.xlsx，252 行，5 字段，0 警告\n下一步：可进入下游收入回款确认，或经授权后上传至飞书 Bitable\n```\n\n## 产物说明\n\n`output/支付宝回款_202605_汇总.xlsx` 含两个 sheet：\n\n- **results**（252 行门店级基础事实字段）：`期间 | 门店编号 | 来源文件 | 折后收入 | 服务费`\n- **__meta__**：recog_id、period、生成时间、分组字段等元信息\n\n## 汇总数据\n\n7 个账户主体、252 家门店，合计：\n\n| 指标 | 金额（元） |\n|---|---:|\n| 折后收入合计 | 8,632,795.47 |\n| 服务费合计 | -17,994.37 |\n| 实收净额合计 | 8,614,801.10 |\n\n按来源文件（账户主体）分布：\n\n| 来源文件 | 门店数 | 折后收入 | 服务费 |\n|---|---:|---:|---:|\n| 张林 | 59 | 2,517,240.96 | -5,031.99 |\n| 换乘 | 37 | 1,421,677.63 | -2,843.69 |\n| 武汉市蔡林记餐饮发展有限公司 | 124 | 2,340,288.54 | -4,699.37 |\n| 武汉蔡林记主题餐饮有限公司 | 1 | 181,610.00 | -1,092.60 |\n| 武汉蔡林记餐饮管理有限公司 | 22 | 1,009,846.59 | -1,998.05 |\n| 蔡林记商业餐饮管理有限公司 | 4 | 1,109,953.80 | -2,224.32 |\n| 蔡林记（郑州）餐饮服务有限公司 | 5 | 52,177.95 | -104.35 |\n\n各项合计与各源 CSV 的「合计」行一致。校验阶段 0 错误、preview 阶段 0 警告。\n\n## 边界说明\n\n- 本次只完成 SOP 第 3 步「汇总」，产物是门店级基础事实字段（折后收入、服务费），**不是**最终收入确认结果。折后收入如何映射到实际回款、税费、配送费等属于下游「收入回款确认」阶段。\n- 未执行上传。如需把结果写入飞书 Bitable（表 `tblRqpGT6MMq3V6M`），请明确授权后再用 `--upload` 执行。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/支付宝回款_202605_汇总.xlsx",
+        "sha256": "b633084ea9071470fe9209662da680648ca03ab1488cb7cb77080ee39bfbaaaa",
+        "size_bytes": 14241
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 252,
+        "compared_fields": [
+          "期间",
+          "门店编号",
+          "来源文件",
+          "折后收入",
+          "服务费"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/支付宝回款_202605_汇总.xlsx",
+        "key_fields": [
+          "期间",
+          "门店编号",
+          "来源文件"
+        ],
+        "period": "202605",
+        "preview_count": 252,
+        "recog_id": "alipay_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblRqpGT6MMq3V6M"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=alipay_settlement，period=202605，row_count=252。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 187497,
+    "tokens": {
+      "input": 49081,
+      "output": 915,
+      "total": 49996
+    }
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

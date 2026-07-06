@@ -1,0 +1,44 @@
+{
+  "case_id": "meituan_voucher_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "汇总已阻断在 validate 阶段。源文件格式与 `美团团购回款` 确认项目的规则不匹配，需要先做文件预处理。\n\n## 结论\n\n```text\n结论：已阻断\n阶段：validate\n项目：meituan_voucher_settlement（美团团购回款）\n期间：202605\n输入：input/美团团购/收益列表/（6 个 xlsx）\n产物：无（校验未通过，不进入 preview）\n风险或下一步：源文件需预处理——缺少规则要求的「收益明细」交易明细 sheet\n```\n\n## 阻断原因\n\n规则（从飞书配置加载）要求源文件包含 sheet **`收益明细`**（交易明细级，表头在第 1 行），字段包括 `美团门店ID`、`美团门店名称`、`商家应得`、`售价（美团售价）`、`收款账户`、`付款成功时间` 等。其中 `付款成功时间` 是把 `商家应得` 拆成 `已结算 / 未结算 / 跨月结算` 的条件依据。\n\n但 `input/美团团购/收益列表/` 下 6 个文件都是**「新版收益列表」聚合报表**，每个文件只有 4 个 sheet：\n\n| 实际 sheet | 内容 |\n|---|---|\n| 按门店 | 按门店汇总 |\n| 按日期 | 按日期汇总 |\n| 按项目 | 按项目汇总 |\n| 按账户 | 按账户汇总 |\n\n关键差异：\n- **没有 `收益明细` sheet**，validate 报 `Required sheet is missing`。\n- `按门店` sheet 虽含 `美团门店ID / 美团门店名称 / 售价（美团售价） / 商家应得`，但**缺 `付款成功时间`、`收款账户`**，且 `促销费`、`服务费（含平台服务费+合作商商业支持服务费）` 等字段名与规则期望的 `商家承担促销费-随单抵扣`、`服务费（平台实际扣除）` 也不一致。\n- 没有 `付款成功时间`，就无法拆分当月已结算 / 跨月 / 未结算金额。\n\n## 下一步\n\n这是文件预处理问题（sheet 不对），按 SOP 应路由到「文件预处理」阶段，不在当前汇总 skill 范围内。建议：\n\n1. 从美团后台改为导出**「收益明细」**（交易明细级，含 `付款成功时间`、`收款账户` 列）放到 `input/美团团购/` 下，再重跑 validate + preview；或\n2. 若只有「新版收益列表」可用，需要先补一个预处理步骤把它转成规则要求的 `收益明细` 结构（尤其要补交易时间维度）。\n\n需要我帮你确认其它平台目录里是否有对应的「收益明细」文件，或用现有 `按门店` sheet 做一份非规则驱动的门店级金额试算（仅 `商家应得`、`售价` 等可比对字段，不含已结算/未结算拆分）作为参考吗？后者属于下游字段、不在汇总 skill 边界内，需你确认后再做。",
+  "graders": [
+    {
+      "evidence": {
+        "checked_dir": "outputs/"
+      },
+      "id": "preview_file_exists",
+      "score": 0,
+      "summary": "未在 outputs/ 中找到 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "checked_dir": "outputs/"
+      },
+      "id": "preview_matches_baseline",
+      "score": 0,
+      "summary": "未在 outputs/ 中找到 preview 产物，无法做 baseline 对账。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 297874,
+    "tokens": {
+      "input": 79814,
+      "output": 718,
+      "total": 80532
+    }
+  },
+  "score": 0,
+  "status": "completed",
+  "verdict": "fail"
+}

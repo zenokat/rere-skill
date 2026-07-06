@@ -1,0 +1,84 @@
+{
+  "case_id": "douyin_voucher_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "202605 抖音回款汇总完成。\n\n## 结论：成功\n\n```text\n阶段：list → validate → preview\n项目：douyin_voucher_settlement（抖音回款）\n期间：202605\n输入：input/抖音/（7 个账单文件，2026-05-01 ~ 2026-05-31）\n产物：output/202605_douyin_voucher_settlement.xlsx\n      row_count=282，field_count=21，warnings=[]\n```\n\n## 汇总数字（282 行，覆盖 221 个门店）\n\n| 字段 | 金额（元） |\n|---|---:|\n| 订单实收金额 | 1,868,812.57 |\n| 券售卖金额（正） | 1,944,047.81 |\n| 券售卖金额（负，退款） | -32,519.70 |\n| 商家补贴金额 | 42,715.54 |\n| 软件服务费 | -46,806.98 |\n| 服务商佣金 | -52,692.83 |\n| 达人佣金 | -2,396.41 |\n| **实际回款** | **1,766,916.35** |\n| 已结算金额（本期间结算） | 1,480,740.31 |\n| 跨月结算金额（次月结算） | 226,478.94 |\n| 未结算金额 | 59,697.10 |\n\n> 校验提示：1,480,740.31 + 226,478.94 + 59,697.10 = 1,766,916.35，与「实际回款」勾稽一致。\n\n## 说明\n\n- 源文件：`input/抖音/` 下 7 个账单（含深圳、郑州吾悦广场、餐饮管理、龙湖美盛天街店、石家庄、银湖城、麻城广场）。\n- 结果文件已复制到 `output/202605_douyin_voucher_settlement.xlsx`（含 `results` 与 `__meta__` 两个 sheet）。\n- 本产物为汇总阶段门店级基础事实字段，是下游「收入回款确认」的原材料，**未**做折后收入、税费、配送费等最终确认计算，也**未**上传至飞书结果表。如需上传，请明确授权（默认 `--upload` / `--append` / `--upsert` 三种策略）。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_douyin_voucher_settlement.xlsx",
+        "sha256": "28e3d1d83e34c8d1d1b4e97a58d4f3ee8a2912073c92df84740a7da7ed6fff2c",
+        "size_bytes": 40031
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 282,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "平台门店名称",
+          "收款账号",
+          "收款户名",
+          "订单实收金额",
+          "软件服务费",
+          "达人佣金",
+          "撮合经纪服务费",
+          "服务商佣金",
+          "职人激励佣金",
+          "店员激励佣金",
+          "分期免息手续费",
+          "保险费用",
+          "券售卖金额正",
+          "券售卖金额负",
+          "商家补贴金额",
+          "实际回款",
+          "未结算金额",
+          "跨月结算金额",
+          "已结算金额"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_douyin_voucher_settlement.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID",
+          "平台门店名称",
+          "收款账号",
+          "收款户名"
+        ],
+        "period": "202605",
+        "preview_count": 282,
+        "recog_id": "douyin_voucher_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblnsZ6GV3bHTW9y"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=douyin_voucher_settlement，period=202605，row_count=282。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 396905,
+    "tokens": {
+      "input": 54639,
+      "output": 547,
+      "total": 55186
+    }
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

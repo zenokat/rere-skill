@@ -1,0 +1,70 @@
+{
+  "case_id": "member_collection_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "汇总完成。202605 期代收会员储值汇总结果如下：\n\n## 结论\n\n- **阶段**：list → validate → preview 全部通过\n- **项目**：`member_collection`（代收会员储值）\n- **期间**：202605\n- **源文件**：`input/收入收款方式构成表 20260501-20260531(2026-06-01 09_53_29)_888.xlsx`\n- **产物**：`output/202605_member_collection.xlsx`（231 行 × 10 字段，无警告）\n\n## 汇总数据（231 家门店）\n\n| 收款方式 | 金额（元） |\n|---|---:|\n| 微信 | 3,277,276.90 |\n| 人民币 | 451,349.50 |\n| 支付宝 | 389,973.00 |\n| 美团券 | 43,412.00 |\n| 云闪付 | 2,300.00 |\n| 抖音券 | 0.00 |\n| 退现金卡值 | -4,165.02 |\n| **收款合计** | **4,167,892.68** |\n\n## 收款合计 Top 5 门店\n\n| 门店 | 收款合计（元） |\n|---|---:|\n| 蔡林记中南天紫广场店 | 143,479.51 |\n| 蔡林记佛祖岭流芳路店 | 134,300.00 |\n| 蔡林记襄阳春园路店 | 111,230.00 |\n| 蔡林记天顺园店 | 93,600.00 |\n| 蔡林记千年美丽店 | 80,211.00 |\n\n## 说明\n\n- 源文件选择：先尝试了「收银汇总表」，但其缺少 `储值收款方式构成`、`会员余额退款` 等必需字段，validate 不通过；改用「收入收款方式构成表」后结构校验通过，符合 `member_collection` 项目的源结构定义。\n- `抖音券` 字段为可选且本期为 0。\n- 结果文件已复制到 `output/202605_member_collection.xlsx`，可用于人工复核或后续上传。如需上传到飞书 Bitable，请明确授权后再执行 `--upload`。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_member_collection.xlsx",
+        "sha256": "6e64f7ef97d6b27a1e5c9db26e318d3e7d81c4e6daa274b66b3392bda523b094",
+        "size_bytes": 17592
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 231,
+        "compared_fields": [
+          "期间",
+          "全来店名称",
+          "抖音券",
+          "美团券",
+          "人民币",
+          "微信",
+          "支付宝",
+          "云闪付",
+          "退现金卡值",
+          "收款合计"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_member_collection.xlsx",
+        "key_fields": [
+          "期间",
+          "全来店名称"
+        ],
+        "period": "202605",
+        "preview_count": 231,
+        "recog_id": "member_collection",
+        "sample_differences": [],
+        "target_table_id": "tblvkgGAS2PGRzy7"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=member_collection，period=202605，row_count=231。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 190221,
+    "tokens": {
+      "input": 56579,
+      "output": 521,
+      "total": 57100
+    }
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

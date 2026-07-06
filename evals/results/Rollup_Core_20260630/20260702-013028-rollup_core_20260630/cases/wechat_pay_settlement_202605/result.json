@@ -1,0 +1,69 @@
+{
+  "case_id": "wechat_pay_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "202605 微信回款汇总完成。\n\n```text\n结论：成功\n阶段：preview（未上传，按规范上传需单独授权）\n项目：wechat_pay_settlement / 微信回款\n期间：202605\n输入：input/微信/（8 个商户主体的微信交易 CSV）\n产物：output/202605_wechat_pay_settlement_20260702-015553.xlsx\n      row_count=486，field_count=7，warnings=[]\n风险或下一步：结果仅供人工复核；如需入业务表，请明确授权后执行 --upload\n```\n\n**汇总结果概览**（7 个字段：期间 / 平台ID / 平台门店名称 / 来源文件 / 订单金额 / 退款金额 / 手续费）\n\n- 门店级记录：486 行，覆盖 288 个平台门店\n- 订单金额合计：¥29,034,825.02\n- 退款金额合计：¥131,607.48\n- 手续费合计：¥74,607.17\n\n**按来源文件（商户主体）分布**\n\n| 来源文件 | 记录数 |\n|---|---|\n| 武汉蔡林记商贸有限公司 | 220 |\n| 武汉市蔡林记餐饮发展有限公司 | 125 |\n| 武汉蔡林记餐饮管理有限公司 | 119 |\n| 蔡林记（深圳）餐饮管理有限公司 | 10 |\n| 蔡林记（郑州）餐饮服务有限公司 | 5 |\n| 蔡林记商业餐饮管理有限公司 | 4 |\n| 武汉蔡林记主题餐饮有限公司 | 2 |\n| 会员商城 | 1 |\n\n执行流程：`list_recog_items` 定位到 `wechat_pay_settlement` → `--validate` 结构校验 0 错误（sheet/字段/目标表均通过）→ `--preview --period 202605` 生成上述结果文件。结果文件已落在 sandbox `output/` 目录，需要人工复核；如需上传到飞书 Bitable 结果表，请明确授权我再执行 `--upload`。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_wechat_pay_settlement_20260702-015553.xlsx",
+        "sha256": "994095854d7aba5b79c771205c3698341f0cd8f44559a52e4efb038a393825e4",
+        "size_bytes": 29456
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 486,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "平台门店名称",
+          "来源文件",
+          "订单金额",
+          "退款金额",
+          "手续费"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_wechat_pay_settlement_20260702-015553.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID",
+          "平台门店名称",
+          "来源文件"
+        ],
+        "period": "202605",
+        "preview_count": 486,
+        "recog_id": "wechat_pay_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblS4S9FJkrOY8sc"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=wechat_pay_settlement，period=202605，row_count=486。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 248109,
+    "tokens": {
+      "input": 48800,
+      "output": 444,
+      "total": 49244
+    }
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

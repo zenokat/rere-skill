@@ -1,0 +1,23 @@
+{
+  "batch_id": "20260702-013028-rollup_core_20260630",
+  "case_counts": {
+    "completed": 13,
+    "failed": 5,
+    "passed": 9,
+    "total": 14
+  },
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 5404354,
+    "tokens": {
+      "input": 747443,
+      "output": 6476,
+      "total": 753919
+    }
+  },
+  "status": "failed",
+  "suite_id": "Rollup_Core_20260630"
+}

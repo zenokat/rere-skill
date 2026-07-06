@@ -1,0 +1,92 @@
+{
+  "case_id": "dine_in_revenue_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "202605 堂食收入汇总完成。\n\n## 结论：成功\n- **阶段**：list → validate → preview\n- **项目**：`dine_in_revenue`（堂食收入）\n- **期间**：202605\n- **源文件**：`input/收银汇总表 202605-202605(2026-06-01 09_43_35)_888.xlsx`\n- **产物**：`output/堂食收入_202605_汇总预览.xlsx`（297 行门店 × 32 字段，0 警告）\n\n## 关键汇总数字（297 家门店）\n\n| 指标 | 金额（元） | 非零门店 |\n|---|---:|---:|\n| **堂食流水金额** | **51,877,345.74** | 294 |\n| **堂食实收金额** | **49,339,005.28** | 294 |\n| 总流水金额 | 72,905,337.32 | 295 |\n| 总实收金额 | 62,691,667.30 | 294 |\n| 优惠金额 | 10,213,683.02 | 265 |\n| 自提流水/实收 | 25,545.40 / 23,848.84 | 36 |\n| 外带流水/实收 | 154,164.20 / 146,946.93 | 46 |\n\n**收款方式构成（实收组成）**：微信-主 28,208,957.32 ｜ 支付宝-主 8,905,797.19 ｜ 会员消费 4,145,386.88 ｜ RMB（现金）2,790,891.66 ｜ 美团券 3,025,147.00 ｜ 抖音券 1,966,629.44 ｜ 高德券 10,883.60\n\n## 说明\n- validate 全部通过（error_count=0，含堂食流水金额/堂食实收金额等规则字段），preview 无警告。\n- `result_file` 是门店级基础事实字段的试算预览，供人工复核或受控上传，**不是**最终收入确认结果；折后收入、实际回款、服务费/税费等属下游\"收入回款确认\"阶段。\n- 工具原始产物落在外部 `D:\\AI\\rere-agent\\.tmp\\outputs\\`，已复制一份到工作区 `output/堂食收入_202605_汇总预览.xlsx` 供你查看。\n- 如需上传到飞书 Bitable（`dine_in_revenue` 表），请明确授权后我再执行 `--upload`。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/堂食收入_202605_汇总预览.xlsx",
+        "sha256": "13942c1a1269a48d676304f1ad1454dc19f7403c159edecb4eb016e9017c1e53",
+        "size_bytes": 51753
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 297,
+        "compared_fields": [
+          "期间",
+          "全来店ID",
+          "RMB",
+          "千宝结算",
+          "协议账户",
+          "摩尔城券结算",
+          "摩尔城折扣",
+          "襄阳中心医院结算",
+          "线下团购",
+          "微信-主",
+          "微信补录",
+          "支付宝-主",
+          "支付宝补录",
+          "云闪付-主",
+          "云闪付补录",
+          "抖音券",
+          "抖音来客",
+          "美团券",
+          "美团企业结算",
+          "会员消费",
+          "高德券",
+          "支付宝神券",
+          "三方会员现金卡值",
+          "流水金额",
+          "优惠金额",
+          "实收金额",
+          "堂食流水金额",
+          "堂食实收金额",
+          "自提流水金额",
+          "自提实收金额",
+          "外带流水金额",
+          "外带实收金额"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/堂食收入_202605_汇总预览.xlsx",
+        "key_fields": [
+          "期间",
+          "全来店ID"
+        ],
+        "period": "202605",
+        "preview_count": 297,
+        "recog_id": "dine_in_revenue",
+        "sample_differences": [],
+        "target_table_id": "tbl362y6MNstoTnE"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=dine_in_revenue，period=202605，row_count=297。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 172677,
+    "tokens": {
+      "input": 56402,
+      "output": 616,
+      "total": 57018
+    }
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

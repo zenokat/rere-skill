@@ -1,0 +1,70 @@
+{
+  "case_id": "meituan_delivery_revenue_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "202605 美团外卖收入汇总完成。\n\n## 结论\n\n```text\n结论：成功\n阶段：list → validate → preview\n项目：meituan_delivery_revenue（美团外卖收入）\n期间：202605\n输入：input/美团外卖收入/（7 个 CSV，含 1 个全部门店文件 + 6 个独立账户门店文件）\n产物：output/202605_美团外卖收入_汇总结果.xlsx，row_count=237，field_count=10，warnings=[]\n```\n\n## 数据处理说明\n\n- `input/美团外卖收入/` 下「全部门店」文件覆盖账户 CLJZB001 的 200+ 家蔡林记门店；6 个独立文件分属不同美团商户账户（wmcljq48216、XGmatang123 等），门店互不重叠，已核实无重复计数风险，故整目录作为干净源输入。\n- 结构校验（validate）全部通过，0 错误；佣金/配送服务费为可选字段，源文件未单独拆分（已由「平台服务费(含佣金和配送服务费)」合并列覆盖）。\n\n## 202605 汇总合计（237 家门店）\n\n| 字段 | 金额（元） |\n|---|---:|\n| 商品原价 | 10,518,268.09 |\n| 包装费 | 560,879.13 |\n| 顾客配送费 | 91.10 |\n| 商家活动支出 | 2,134,313.79 |\n| 其它支出 | 187,891.81 |\n| 平台服务费(含佣金和配送服务费) | 1,979,568.84 |\n\n商品原价 Top 3 门店：平台ID 1802827（124,436.00）、18289169（116,166.84）、31723967（113,982.90）。\n\n## 边界与下一步\n\n- 本次产物是**门店级基础事实字段**（汇总阶段的交接物），不是最终收入确认结果。折后收入、实际回款、平台服务费/税费的最终口径属于下游「收入回款确认」阶段，未在本次范围内计算。\n- **未执行上传**：上传是受控动作，需你明确授权后才会把结果写入飞书 Bitable（`tbl5KtaRvsWge30r`）。如需上传，请确认目标环境并告知策略（默认 / --append / --upsert）。\n\n结果文件：`output/202605_美团外卖收入_汇总结果.xlsx`",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_美团外卖收入_汇总结果.xlsx",
+        "sha256": "b10d4c40e389e07134983f92ff57ea1412468c2d803636a27db3e7c134f412c1",
+        "size_bytes": 19771
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 237,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "商品原价",
+          "包装费",
+          "顾客配送费",
+          "商家活动支出",
+          "其它支出",
+          "佣金",
+          "配送服务费",
+          "平台服务费(含佣金和配送服务费)"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_美团外卖收入_汇总结果.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID"
+        ],
+        "period": "202605",
+        "preview_count": 237,
+        "recog_id": "meituan_delivery_revenue",
+        "sample_differences": [],
+        "target_table_id": "tbl5KtaRvsWge30r"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=meituan_delivery_revenue，period=202605，row_count=237。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 237296,
+    "tokens": {
+      "input": 68983,
+      "output": 562,
+      "total": 69545
+    }
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

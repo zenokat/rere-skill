@@ -1,0 +1,78 @@
+{
+  "case_id": "jingdong_delivery_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "汇总完成。202605 京东外卖回款已生成试算预览结果。\n\n## 汇总结果\n\n**产物文件**：`output/202605_jingdong_delivery_settlement_20260702-022804.xlsx`\n**项目**：京东外卖回款（`jingdong_delivery_settlement`）\n**期间**：202605\n**门店级记录**：188 行 × 16 字段，无警告\n\n### 全局合计（188 家门店）\n\n| 字段 | 金额（元） |\n|---|---:|\n| 实际回款 | 1,359,631.61 |\n| 已结算金额 | 1,300,543.34 |\n| 未结算金额 | 59,088.27 |\n| 跨月结算金额 | 0.00 |\n| 总佣金 | -79,631.43 |\n| 配送费开票 | -177,172.63 |\n| 商家承担运费补贴 | -61,496.00 |\n| -保险费 | -27,324.54 |\n| 保险理赔 | 1,125.75 |\n| 赔付 | 248.37 |\n| 商家承担小费 | -3.00 |\n| 平台运费补贴 | 0.00 |\n\n### 按收款户名分布\n\n| 收款户名 | 门店数 | 实际回款（元） |\n|---|---:|---:|\n| 武汉蔡林记餐饮管理有限公司 | 110 | 1,020,350.14 |\n| 武汉市蔡林记餐饮发展有限公司 | 63 | 302,645.22 |\n| 蔡林记（深圳）餐饮管理有限公司 | 10 | 27,675.90 |\n| 蔡林记（郑州）餐饮管理有限公司 | 4 | 8,525.99 |\n| 深圳市乐达永溢餐饮管理有限公司 | 1 | 434.36 |\n\n### 流程说明\n1. `list_recog_items` 匹配到项目 `jingdong_delivery_settlement`（京东外卖回款）。\n2. `--validate` 对 `input/京东外卖回款` 目录做结构检验：sheet、数据范围、12 条规则字段与条件、Bitable 目标字段全部通过，0 错误。\n3. `--preview --period 202605` 生成 188 条门店级基础事实字段，写入 `output/` 目录。\n\n产物是汇总阶段（SOP 第 3 步）的门店级基础事实字段，供人工复核或后续受控上传；折后收入、平台服务费、税费等最终确认字段属于下游\"收入回款确认\"阶段，本次未计算。如需将结果上传到飞书 Bitable，请明确授权后我再执行 `--upload`。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_jingdong_delivery_settlement_20260702-022804.xlsx",
+        "sha256": "baee30de93c350b566413ce00b66a03afb67508d8cedb57b6e20fc351d0102fa",
+        "size_bytes": 22917
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 188,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "收款账号",
+          "收款户名",
+          "实际回款",
+          "商家承担运费补贴",
+          "配送费开票",
+          "商家承担小费",
+          "平台运费补贴",
+          "赔付",
+          "总佣金",
+          "-保险费",
+          "保险理赔",
+          "未结算金额",
+          "跨月结算金额",
+          "已结算金额"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_jingdong_delivery_settlement_20260702-022804.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID",
+          "收款账号",
+          "收款户名"
+        ],
+        "period": "202605",
+        "preview_count": 188,
+        "recog_id": "jingdong_delivery_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblQkl5JlhKAcBAB"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=jingdong_delivery_settlement，period=202605，row_count=188。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 625531,
+    "tokens": {
+      "input": 55171,
+      "output": 617,
+      "total": 55788
+    }
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

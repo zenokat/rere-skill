@@ -1,0 +1,70 @@
+{
+  "case_id": "meituan_delivery_settlement_202605",
+  "evidence": {
+    "missing": [
+      "codebuddy_session_jsonl"
+    ],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "CodeBuddy run timed out.",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_meituan_delivery_settlement_20260702-025937.xlsx",
+        "sha256": "845639aa0678d1e6fc6f824e5d117cec3ec049c93df4ef56496a80376c05b0b0",
+        "size_bytes": 15993
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 237,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "结算id",
+          "平台服务费返还",
+          "实际回款",
+          "调整项",
+          "外卖账单结算金额"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_meituan_delivery_settlement_20260702-025937.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID",
+          "结算id"
+        ],
+        "period": "202605",
+        "preview_count": 237,
+        "recog_id": "meituan_delivery_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblnuOGqHci3TRnr"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=meituan_delivery_settlement，period=202605，row_count=237。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 1142123,
+    "tokens": {
+      "input": null,
+      "output": null,
+      "total": null
+    }
+  },
+  "score": 0,
+  "status": "failed",
+  "verdict": "fail"
+}

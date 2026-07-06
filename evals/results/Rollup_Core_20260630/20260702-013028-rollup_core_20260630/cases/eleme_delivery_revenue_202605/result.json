@@ -1,0 +1,48 @@
+{
+  "case_id": "eleme_delivery_revenue_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "已完成。汇总结果已输出到 `output/饿了么收入汇总_202605.xlsx`。\n\n## 202605 饿了么收入汇总\n\n**结算金额（净收入）合计：5,169,179.25 元**，共 236 家门店。\n\n### 关键处理：去重\n`input/饿了么收入/` 下有 15 个账单文件，其中：\n- **1 个汇总文件**（`1780293102444-蔡林记…`）：覆盖 222 家门店，结算金额 5,001,728.07 元\n- **12 个独立门店账单**：不在汇总文件中，结算金额合计 167,451.18 元\n- **2 个独立文件已剔除**（孝感麻糖米酒湖口店、蔡林记时代广场店）：其数据与汇总文件**逐日逐行完全一致**（已验证），计入会重复\n\n### 收入构成\n| 科目 | 金额（元） |\n|---|---:|\n| 外卖订单 | 5,283,831.96 |\n| 退单 | -18,550.13 |\n| 赔偿单 | 7,144.11 |\n| 推广佣金 | -89,022.82 |\n| 保障服务费用 | -37,208.18 |\n| 余额变动费用 | 23,204.69 |\n| 补发菜品配送费 | -220.38 |\n| **结算金额合计** | **5,169,179.25** |\n\n### 输出文件包含 3 个 sheet\n1. **收入总览** — 按科目汇总（汇总文件 / 独立门店 / 合计）\n2. **门店收入明细** — 236 家门店按收入降序，含各账单类型拆分，附合计行\n3. **数据来源说明** — 源文件清单、去重依据、口径说明\n\n生成脚本保留在 `build_summary.py`，便于复核或复用。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/饿了么收入汇总_202605.xlsx",
+        "sha256": "e0ea27772033186285c0743e830d7cc802b9a4ab0b4116b68e911a54a94f6bc3",
+        "size_bytes": 29984
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "error": "preview Excel missing sheet: results",
+        "error_type": "ValueError",
+        "file": "outputs/饿了么收入汇总_202605.xlsx"
+      },
+      "id": "preview_matches_baseline",
+      "score": 0,
+      "summary": "baseline 对账 grader 执行失败。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 484742,
+    "tokens": {
+      "input": 71977,
+      "output": 442,
+      "total": 72419
+    }
+  },
+  "score": 0,
+  "status": "completed",
+  "verdict": "fail"
+}
