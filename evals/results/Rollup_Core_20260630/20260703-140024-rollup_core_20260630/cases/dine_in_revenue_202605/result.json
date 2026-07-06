@@ -1,0 +1,157 @@
+{
+  "case_id": "dine_in_revenue_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "汇总完成。以下是结果总结：\n\n---\n\n**结论：成功**\n\n| 项目 | 值 |\n|------|------|\n| **阶段** | preview（试算预览） |\n| **项目** | `dine_in_revenue`（堂食收入） |\n| **期间** | 202605 |\n| **输入** | `input/收银汇总表 202605-202605(2026-06-01 09_43_35)_888.xlsx` |\n| **产物** | `output/202605_dine_in_revenue_20260703-140239.xlsx` |\n| **行数** | 297 条门店记录 |\n| **字段数** | 32 个字段 |\n| **警告** | 无 |\n\n**汇总字段概览：**\n- 基础字段：`期间`、`全来店ID`、`流水金额`、`优惠金额`、`实收金额`\n- 堂食专项：`堂食流水金额`、`堂食实收金额`\n- 自提/外带：`自提流水金额`、`自提实收金额`、`外带流水金额`、`外带实收金额`\n- 支付方式：RMB、千宝、微信、支付宝、云闪付、抖音、美团、高德、会员消费等\n\n产物文件已保存至 `output/202605_dine_in_revenue_20260703-140239.xlsx`，这是门店级基础事实字段，供下游收入回款确认继续使用。如需要上传到飞书 Bitable 或进一步处理，请告知。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_dine_in_revenue_20260703-140239.xlsx",
+        "sha256": "5ae9e38d422f104d7a7342e267d543e9d865b49dc178a28bd559fb296b64feb5",
+        "size_bytes": 51753
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 297,
+        "compared_fields": [
+          "期间",
+          "全来店ID",
+          "RMB",
+          "千宝结算",
+          "协议账户",
+          "摩尔城券结算",
+          "摩尔城折扣",
+          "襄阳中心医院结算",
+          "线下团购",
+          "微信-主",
+          "微信补录",
+          "支付宝-主",
+          "支付宝补录",
+          "云闪付-主",
+          "云闪付补录",
+          "抖音券",
+          "抖音来客",
+          "美团券",
+          "美团企业结算",
+          "会员消费",
+          "高德券",
+          "支付宝神券",
+          "三方会员现金卡值",
+          "流水金额",
+          "优惠金额",
+          "实收金额",
+          "堂食流水金额",
+          "堂食实收金额",
+          "自提流水金额",
+          "自提实收金额",
+          "外带流水金额",
+          "外带实收金额"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_dine_in_revenue_20260703-140239.xlsx",
+        "key_fields": [
+          "期间",
+          "全来店ID"
+        ],
+        "period": "202605",
+        "preview_count": 297,
+        "recog_id": "dine_in_revenue",
+        "sample_differences": [],
+        "target_table_id": "tbl362y6MNstoTnE"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=dine_in_revenue，period=202605，row_count=297。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/dine_in_revenue_202605-3a1e9c8d/.workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.py 2>&1"
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 3,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/dine_in_revenue_202605-3a1e9c8d/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --vali...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/dine_in_revenue_202605-3a1e9c8d/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --vali...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/dine_in_revenue_202605-3a1e9c8d/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --prev..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=3。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 2,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/dine_in_revenue_202605-3a1e9c8d/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --vali...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/dine_in_revenue_202605-3a1e9c8d/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --vali..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/dine_in_revenue_202605-3a1e9c8d/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --prev..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 164751,
+    "tokens": {
+      "input": 66020,
+      "output": 495,
+      "total": 66515
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "custom-local:deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

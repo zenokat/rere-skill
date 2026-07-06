@@ -1,0 +1,140 @@
+{
+  "case_id": "meituan_voucher_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "---\n\n**结论：成功**\n\n| 项目 | 详情 |\n|---|---|\n| **阶段** | preview（试算预览） |\n| **项目** | `meituan_voucher_settlement`（美团团购回款） |\n| **期间** | 202605 |\n| **源文件** | `input/美团团购/收益明细/` 下 6 个文件（总账号、深圳、广州、石家庄、洛阳、孝感麻糖） |\n| **处理过程** | 6 个源文件 → 聚合 446 组门店记录 → 产出 273 行门店级汇总 |\n| **产物** | `output/202605_美团团购回款汇总.xlsx`（273 行 x 15 字段） |\n| **警告** | 无 |\n| **下一步** | 结果文件可供人工复核，复核通过后可执行 `--upload` 上传至飞书 Bitable |",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_美团团购回款汇总.xlsx",
+        "sha256": "8d1049e1c3c5d147414cf958bef335ab870000f544a119c811421a9c505610a6",
+        "size_bytes": 31590
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 273,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "平台门店名称",
+          "收款账号",
+          "服务费（平台实际扣除）",
+          "实际回款",
+          "售价",
+          "商家承担促销费-随单抵扣",
+          "未结算金额",
+          "跨月结算金额",
+          "已结算金额",
+          "商家承担促销费-营销账户余额抵扣",
+          "商家承担促销费-配送费减免",
+          "合作商商业支持费用",
+          "服务费-配送费"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_美团团购回款汇总.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID",
+          "平台门店名称",
+          "收款账号"
+        ],
+        "period": "202605",
+        "preview_count": 273,
+        "recog_id": "meituan_voucher_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblv7qBT9AgLiDOT"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=meituan_voucher_settlement，period=202605，row_count=273。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.py"
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 2,
+        "sample_commands": [
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --validate --recog_id meituan_voucher_settlement --source_file \"../../../input/美团团购/收益明细/\"",
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --preview --recog_id meituan_voucher_settlement --period 202605 --source_file \"../../../input/美团团购/收益明细/\""
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --validate --recog_id meituan_voucher_settlement --source_file \"../../../input/美团团购/收益明细/\""
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --preview --recog_id meituan_voucher_settlement --period 202605 --source_file \"../../../input/美团团购/收益明细/\""
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 355273,
+    "tokens": {
+      "input": 38777,
+      "output": 213,
+      "total": 38990
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "custom-local:deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

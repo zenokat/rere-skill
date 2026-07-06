@@ -1,0 +1,131 @@
+{
+  "case_id": "alipay_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "---\n\n**结论：成功**\n\n| 项目 | 详情 |\n|---|---|\n| **阶段** | validate → preview |\n| **项目** | `alipay_settlement` (支付宝回款) |\n| **期间** | 202605 |\n| **输入** | `input/支付宝/` — 7 个主体 CSV 文件 |\n| **校验** | 全部通过 (sheet、数据范围、字段存在性、Bitable 目标字段) |\n| **产物** | `output/202605_alipay_settlement_20260703-143736.xlsx` |\n| **汇总结果** | 252 行，5 个字段 (期间、门店编号、来源文件、折后收入、服务费) |\n| **警告** | 无 |\n\n涉及的 7 个主体：张林、换乘、武汉市蔡林记餐饮发展有限公司、武汉蔡林记主题餐饮有限公司、武汉蔡林记餐饮管理有限公司、蔡林记商业餐饮管理有限公司、蔡林记（郑州）餐饮服务有限公司。\n\n汇总产物已生成到 `output/` 目录，可供人工复核或下一步\"收入回款确认\"阶段使用。如需上传到飞书 Bitable，请明确授权后执行。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_alipay_settlement_20260703-143736.xlsx",
+        "sha256": "089f081406cd8e05da9925f28fbd8bb15e20896197725b579764ac0a16cc5792",
+        "size_bytes": 14240
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 252,
+        "compared_fields": [
+          "期间",
+          "门店编号",
+          "来源文件",
+          "折后收入",
+          "服务费"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_alipay_settlement_20260703-143736.xlsx",
+        "key_fields": [
+          "期间",
+          "门店编号",
+          "来源文件"
+        ],
+        "period": "202605",
+        "preview_count": 252,
+        "recog_id": "alipay_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblRqpGT6MMq3V6M"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=alipay_settlement，period=202605，row_count=252。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd .workbuddy/skills/revenue-recognition && uv run scripts/list_recog_items.py"
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 3,
+        "sample_commands": [
+          "cd .workbuddy/skills/revenue-recognition && uv run scripts/run_recog_rollup.py --validate --recog_id alipay_settlement --source_file \"input/支付宝/\"",
+          "cd .workbuddy/skills/revenue-recognition && uv run scripts/run_recog_rollup.py --validate --recog_id alipay_settlement --source_file \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260...",
+          "cd .workbuddy/skills/revenue-recognition && uv run scripts/run_recog_rollup.py --preview --recog_id alipay_settlement --period 202605 --source_file \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-ro..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=3。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 2,
+        "sample_commands": [
+          "cd .workbuddy/skills/revenue-recognition && uv run scripts/run_recog_rollup.py --validate --recog_id alipay_settlement --source_file \"input/支付宝/\"",
+          "cd .workbuddy/skills/revenue-recognition && uv run scripts/run_recog_rollup.py --validate --recog_id alipay_settlement --source_file \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "cd .workbuddy/skills/revenue-recognition && uv run scripts/run_recog_rollup.py --preview --recog_id alipay_settlement --period 202605 --source_file \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-ro..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 129968,
+    "tokens": {
+      "input": 33960,
+      "output": 368,
+      "total": 34328
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "custom-local:deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

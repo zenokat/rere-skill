@@ -1,0 +1,124 @@
+{
+  "case_id": "member_collection_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "已完成 202605 代收会员储值的汇总，结果文件位于 `output/202605_代收会员储值_汇总结果.xlsx`。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_代收会员储值_汇总结果.xlsx",
+        "sha256": "169ee27896f00f31e18760d87be67fb8b4c9ffb661a23a290acea4129edca954",
+        "size_bytes": 17593
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 231,
+        "compared_fields": [
+          "期间",
+          "全来店名称",
+          "抖音券",
+          "美团券",
+          "人民币",
+          "微信",
+          "支付宝",
+          "云闪付",
+          "退现金卡值",
+          "收款合计"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_代收会员储值_汇总结果.xlsx",
+        "key_fields": [
+          "期间",
+          "全来店名称"
+        ],
+        "period": "202605",
+        "preview_count": 231,
+        "recog_id": "member_collection",
+        "sample_differences": [],
+        "target_table_id": "tblvkgGAS2PGRzy7"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=member_collection，period=202605，row_count=231。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "bash_command_count": 12,
+        "match_count": 0,
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 0,
+      "summary": "Agent 未调用 scripts/list_recog_items.py；共检查 12 条 Bash 命令。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "bash_command_count": 12,
+        "match_count": 0,
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 0,
+      "summary": "Agent 未调用 scripts/run_recog_rollup.py；共检查 12 条 Bash 命令。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "bash_command_count": 12,
+        "match_count": 0,
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 0,
+      "summary": "Agent 未调用 scripts/run_recog_rollup.py，无法检测参数 --validate。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "bash_command_count": 12,
+        "match_count": 0,
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 0,
+      "summary": "Agent 未调用 scripts/run_recog_rollup.py，无法检测参数 --preview。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 358253,
+    "tokens": {
+      "input": 64790,
+      "output": 41,
+      "total": 64831
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 0,
+  "status": "completed",
+  "verdict": "fail"
+}

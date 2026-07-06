@@ -1,0 +1,134 @@
+{
+  "case_id": "eleme_delivery_revenue_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "---\n\n**汇总完成，以下是总结：**\n\n```\n结论：成功\n阶段：validate → preview\n项目：eleme_delivery_revenue（饿了么收入）\n期间：202605\n输入：input/饿了么收入/（15 个门店账单文件）\n产物：output/202605_饿了么收入汇总.xlsx\n```\n\n| 指标 | 数值 |\n|------|------|\n| 源文件数 | 15 个门店 |\n| 汇总行数 | 232 条 |\n| 字段数 | 11 个 |\n| 校验错误 | 0 |\n| 警告 | 无 |\n\n**汇总字段：** 平台ID、商品金额、打包费、商家应收配送费、商家活动补贴、商家代金券补贴、商家智能补贴、智能满减津贴、智能特价菜补贴、爆单红包增量出资、期间。\n\n结果文件已保存至 `output/202605_饿了么收入汇总.xlsx`。这是门店级基础事实字段，可交给人工复核或用于下游\"收入回款确认\"阶段。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_饿了么收入汇总.xlsx",
+        "sha256": "a810c48e692b77743f82c847c1007aafa33e5f9511c3af18e0447dbe6e3170a0",
+        "size_bytes": 19350
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 232,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "商品金额",
+          "打包费",
+          "商家应收配送费",
+          "商家活动补贴",
+          "商家代金券补贴",
+          "商家智能补贴",
+          "智能满减津贴",
+          "智能特价菜补贴",
+          "爆单红包增量出资"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_饿了么收入汇总.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID"
+        ],
+        "period": "202605",
+        "preview_count": 232,
+        "recog_id": "eleme_delivery_revenue",
+        "sample_differences": [],
+        "target_table_id": "tbl78CSsQ23uDG0S"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=eleme_delivery_revenue，period=202605，row_count=232。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"<redacted:rere_eval_sandbox_root>/20260703-140024-rollup_core_20260630/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.py"
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 2,
+        "sample_commands": [
+          "cd \"<redacted:rere_eval_sandbox_root>/20260703-140024-rollup_core_20260630/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --va...",
+          "cd \"<redacted:rere_eval_sandbox_root>/20260703-140024-rollup_core_20260630/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --pr..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"<redacted:rere_eval_sandbox_root>/20260703-140024-rollup_core_20260630/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --va..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"<redacted:rere_eval_sandbox_root>/20260703-140024-rollup_core_20260630/workspaces/eleme_delivery_revenue_2-e2eaef2a/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --pr..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 588469,
+    "tokens": {
+      "input": 39811,
+      "output": 236,
+      "total": 40047
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "custom-local:deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

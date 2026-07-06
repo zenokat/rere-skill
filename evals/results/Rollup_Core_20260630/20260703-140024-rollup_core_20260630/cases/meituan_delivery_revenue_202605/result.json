@@ -1,0 +1,133 @@
+{
+  "case_id": "meituan_delivery_revenue_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "---\n\n## 汇总结果\n\n```\n结论：成功\n阶段：preview\n项目：meituan_delivery_revenue（美团外卖收入）\n期间：202605\n输入：input/美团外卖收入/（7个CSV文件）\n产物：output/202605_美团外卖收入汇总.xlsx（237行 x 10字段）\n风险或下一步：无警告，可进入人工复核或下游收入回款确认\n```\n\n### 数值汇总\n\n| 字段 | 合计金额（元） |\n|---|---|\n| 商品原价 | 10,518,268.09 |\n| 包装费 | 560,879.13 |\n| 顾客配送费 | 91.10 |\n| 商家活动支出 | 2,134,313.79 |\n| 其它支出 | 187,891.81 |\n| 佣金 | 3,833.99 |\n| 配送服务费 | 10,224.17 |\n| 平台服务费(含佣金和配送服务费) | 1,979,568.84 |\n\n### 处理过程\n\n1. **项目识别**: 从14个可用项目中找到 `meituan_delivery_revenue`（美团外卖收入）\n2. **结构校验**: 7个源文件全部通过校验，所有必选字段（平台ID、商品原价、包装费、顾客配送费、商家活动支出、其它支出）均存在，Bitable 目标表字段类型兼容\n3. **试算预览**: 逐文件处理7个门店CSV，按门店+日期聚合为237条记录\n\n结果文件已保存至 `output/202605_美团外卖收入汇总.xlsx`。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_美团外卖收入汇总.xlsx",
+        "sha256": "41b710403b9a5e10c8328ed840143230b88751dc2fa6f6bd9a3a1e5ccd6c5b7c",
+        "size_bytes": 19769
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 237,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "商品原价",
+          "包装费",
+          "顾客配送费",
+          "商家活动支出",
+          "其它支出",
+          "佣金",
+          "配送服务费",
+          "平台服务费(含佣金和配送服务费)"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_美团外卖收入汇总.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID"
+        ],
+        "period": "202605",
+        "preview_count": 237,
+        "recog_id": "meituan_delivery_revenue",
+        "sample_differences": [],
+        "target_table_id": "tbl5KtaRvsWge30r"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=meituan_delivery_revenue，period=202605，row_count=237。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/meituan_delivery_revenue-6eb92e89/.workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.py"
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 2,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/meituan_delivery_revenue-6eb92e89/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --va...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/meituan_delivery_revenue-6eb92e89/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --pr..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/meituan_delivery_revenue-6eb92e89/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --va..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/meituan_delivery_revenue-6eb92e89/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --pr..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 166708,
+    "tokens": {
+      "input": 39989,
+      "output": 362,
+      "total": 40351
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "custom-local:deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

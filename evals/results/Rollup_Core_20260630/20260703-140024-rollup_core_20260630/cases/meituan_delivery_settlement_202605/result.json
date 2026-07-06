@@ -1,0 +1,111 @@
+{
+  "case_id": "meituan_delivery_settlement_202605",
+  "evidence": {
+    "missing": [
+      "sandbox_cleanup_failed: workspace: [WinError 32] 另一个程序正在使用此文件，进程无法访问。: 'D:\\\\tmp\\\\rere-agent-eval-sandboxes\\\\20260703-140024-rollup_core_20260630\\\\workspaces\\\\meituan_delivery_settlem-702918ef\\\\.workbuddy\\\\skills\\\\revenue-recognition'"
+    ],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "大文件仍在处理中。源文件包含了约 450MB 的数据量（3 个全部门店大文件），需要耐心等待。我会在收到完成通知后立即汇总结果。",
+  "graders": [
+    {
+      "evidence": {
+        "checked_dir": "outputs/"
+      },
+      "id": "preview_file_exists",
+      "score": 0,
+      "summary": "未在 outputs/ 中找到 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "checked_dir": "outputs/"
+      },
+      "id": "preview_matches_baseline",
+      "score": 0,
+      "summary": "未在 outputs/ 中找到 preview 产物，无法做 baseline 对账。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.py"
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 3,
+        "sample_commands": [
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --validate --recog_id meituan_delivery_settlement --source_file \"../../input/美团外卖回款\"",
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --validate --recog_id meituan_delivery_settlement --source_file \"<redacted:rere_eval_sandbox_root>/20260703-140024-rollu...",
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --preview --recog_id meituan_delivery_settlement --period 202605 --source_file \"<redacted:rere_eval_sandbox_root>/202607..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=3。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 2,
+        "sample_commands": [
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --validate --recog_id meituan_delivery_settlement --source_file \"../../input/美团外卖回款\"",
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --validate --recog_id meituan_delivery_settlement --source_file \"<redacted:rere_eval_sandbox_root>/20260703-140024-rollu..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \".workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --preview --recog_id meituan_delivery_settlement --period 202605 --source_file \"<redacted:rere_eval_sandbox_root>/202607..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 723822,
+    "tokens": {
+      "input": 37364,
+      "output": 77,
+      "total": 37441
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "custom-local:deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 0,
+  "status": "completed",
+  "verdict": "fail"
+}

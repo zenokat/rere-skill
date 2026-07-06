@@ -1,0 +1,132 @@
+{
+  "case_id": "shouqianba_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "汇总完成。以下是结果总结：\n\n---\n\n**结论：成功**\n\n| 项目 | 值 |\n|---|---|\n| 阶段 | preview（试算预览） |\n| 项目 | `shouqianba_settlement`（收钱吧回款） |\n| 期间 | 202605 |\n| 输入 | `input/收钱吧/`（21 个门店 Excel 文件） |\n| 产物 | `output/202605_shouqianba_settlement.xlsx` |\n| 行数 | 931 行 |\n| 字段数 | 6 个（期间、平台ID、支付方式、来源文件、折后收入、实际回款） |\n\n**合计汇总：**\n\n| 指标 | 金额 |\n|---|---|\n| 折后收入合计 | **41,842,503.77** |\n| 实际回款合计 | **41,740,161.50** |\n\n**按支付方式：**\n\n| 支付方式 | 折后收入 | 实际回款 |\n|---|---|---|\n| 微信 | 32,484,131.51 | 32,400,976.85 |\n| 支付宝 | 9,325,684.37 | 9,306,580.65 |\n| 银联云闪付 | 32,687.89 | 32,604.00 |\n\n**风险和下一步：** 无警告项，结果文件位于 `output/202605_shouqianba_settlement.xlsx`，可交由人工复核或进入下游收入回款确认阶段。如需上传到飞书多维表，请明确授权。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_shouqianba_settlement.xlsx",
+        "sha256": "93394a46f64e3f94d38381fba4aee896d7251c3a86e63d06c5553c63255a5048",
+        "size_bytes": 39313
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 931,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "支付方式",
+          "来源文件",
+          "折后收入",
+          "实际回款"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_shouqianba_settlement.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID",
+          "支付方式",
+          "来源文件"
+        ],
+        "period": "202605",
+        "preview_count": 931,
+        "recog_id": "shouqianba_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblWuKlzwZgorlLF"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=shouqianba_settlement，period=202605，row_count=931。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 2,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/shouqianba_settlement_20-4e9e023c/.workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.py",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/shouqianba_settlement_20-4e9e023c/.workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.py"
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 2,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/shouqianba_settlement_20-4e9e023c/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --va...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/shouqianba_settlement_20-4e9e023c/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --pr..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/shouqianba_settlement_20-4e9e023c/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --va..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/shouqianba_settlement_20-4e9e023c/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --pr..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 144597,
+    "tokens": {
+      "input": 39948,
+      "output": 549,
+      "total": 40497
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "custom-local:deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

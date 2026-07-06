@@ -1,0 +1,132 @@
+{
+  "case_id": "wechat_pay_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "---\n\n**结论：成功**\n\n| 项目 | 详情 |\n|---|---|\n| **阶段** | preview（汇总试算） |\n| **项目** | `wechat_pay_settlement`（微信回款） |\n| **期间** | 202605 |\n| **输入** | `input/微信/`（8 个 CSV 源文件） |\n| **产物** | `output/202605_wechat_pay_settlement_20260703-143508.xlsx` |\n| **行数** | 486 行 |\n| **字段数** | 7 个 |\n| **警告** | 无 |\n\n**源文件覆盖**：8 个主体文件（武汉蔡林记餐饮管理有限公司、武汉市蔡林记餐饮发展有限公司、蔡林记商业餐饮管理有限公司、武汉蔡林记商贸有限公司、武汉蔡林记主题餐饮有限公司、蔡林记（深圳）餐饮管理有限公司、蔡林记（郑州）餐饮服务有限公司、会员商城），共聚合为 511 个分组记录后输出 486 行门店级基础事实数据。\n\n汇总产物已生成到 `output/` 目录，是下游\"收入回款确认\"的字段原材料。如需进一步处理（如验证结果、上传到飞书多维表等），请告知。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_wechat_pay_settlement_20260703-143508.xlsx",
+        "sha256": "5a8c86a74fcb8bc299c862d71954bfe01325ebd37ca0fc53311ce8a5c39bfeef",
+        "size_bytes": 29457
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 486,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "平台门店名称",
+          "来源文件",
+          "订单金额",
+          "退款金额",
+          "手续费"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_wechat_pay_settlement_20260703-143508.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID",
+          "平台门店名称",
+          "来源文件"
+        ],
+        "period": "202605",
+        "preview_count": 486,
+        "recog_id": "wechat_pay_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblS4S9FJkrOY8sc"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=wechat_pay_settlement，period=202605，row_count=486。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "uv run .workbuddy/skills/revenue-recognition/scripts/list_recog_items.py 2>&1"
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 2,
+        "sample_commands": [
+          "uv run .workbuddy/skills/revenue-recognition/scripts/run_recog_rollup.py --validate --recog_id wechat_pay_settlement --source_file input/微信/ 2>&1",
+          "uv run .workbuddy/skills/revenue-recognition/scripts/run_recog_rollup.py --preview --recog_id wechat_pay_settlement --period 202605 --source_file input/微信/ 2>&1"
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 1,
+        "sample_commands": [
+          "uv run .workbuddy/skills/revenue-recognition/scripts/run_recog_rollup.py --validate --recog_id wechat_pay_settlement --source_file input/微信/ 2>&1"
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "uv run .workbuddy/skills/revenue-recognition/scripts/run_recog_rollup.py --preview --recog_id wechat_pay_settlement --period 202605 --source_file input/微信/ 2>&1"
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 223367,
+    "tokens": {
+      "input": 34645,
+      "output": 286,
+      "total": 34931
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "custom-local:deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

@@ -1,0 +1,30 @@
+{
+  "batch_id": "20260703-140024-rollup_core_20260630",
+  "case_counts": {
+    "completed": 14,
+    "failed": 2,
+    "passed": 12,
+    "total": 14
+  },
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 5026891,
+    "tokens": {
+      "input": 638163,
+      "output": 4049,
+      "total": 642212
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "requested": "deepseek-v4-pro"
+  },
+  "status": "failed",
+  "suite_id": "Rollup_Core_20260630"
+}

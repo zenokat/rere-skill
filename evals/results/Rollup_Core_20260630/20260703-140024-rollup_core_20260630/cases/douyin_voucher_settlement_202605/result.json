@@ -1,0 +1,147 @@
+{
+  "case_id": "douyin_voucher_settlement_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "---\n\n**结论：成功**\n\n| 项目 | 内容 |\n|---|---|\n| **阶段** | preview |\n| **项目** | `douyin_voucher_settlement` (抖音回款) |\n| **期间** | 202605 |\n| **输入** | `input/抖音/` (7 个源文件) |\n| **产物** | `output/202605_抖音回款汇总.xlsx` |\n| **行数** | 282 行 |\n| **字段数** | 21 个字段 |\n| **警告** | 无 |\n\n汇总产物已生成到 `output/202605_抖音回款汇总.xlsx`，包含 282 条门店级汇总记录和 21 个基础事实字段（平台ID、平台门店名称、订单实收金额、软件服务费、达人佣金、实际回款、收款账号等）。该文件可直接用于人工复核或下游收入回款确认。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_抖音回款汇总.xlsx",
+        "sha256": "e4277d772b3012f7665266a56a610387724cc3077f5ecbaabd722d40455d5173",
+        "size_bytes": 40032
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 282,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "平台门店名称",
+          "收款账号",
+          "收款户名",
+          "订单实收金额",
+          "软件服务费",
+          "达人佣金",
+          "撮合经纪服务费",
+          "服务商佣金",
+          "职人激励佣金",
+          "店员激励佣金",
+          "分期免息手续费",
+          "保险费用",
+          "券售卖金额正",
+          "券售卖金额负",
+          "商家补贴金额",
+          "实际回款",
+          "未结算金额",
+          "跨月结算金额",
+          "已结算金额"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_抖音回款汇总.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID",
+          "平台门店名称",
+          "收款账号",
+          "收款户名"
+        ],
+        "period": "202605",
+        "preview_count": 282,
+        "recog_id": "douyin_voucher_settlement",
+        "sample_differences": [],
+        "target_table_id": "tblnsZ6GV3bHTW9y"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=douyin_voucher_settlement，period=202605，row_count=282。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/douyin_voucher_settlemen-6fc2a412/.workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.py 2>&1"
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 2,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/douyin_voucher_settlemen-6fc2a412/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --va...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/douyin_voucher_settlemen-6fc2a412/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --pr..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/douyin_voucher_settlemen-6fc2a412/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --va..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260703-140024-rollup_core_20260630/workspaces/douyin_voucher_settlemen-6fc2a412/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py --pr..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 267710,
+    "tokens": {
+      "input": 46073,
+      "output": 209,
+      "total": 46282
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "custom-local:deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}
