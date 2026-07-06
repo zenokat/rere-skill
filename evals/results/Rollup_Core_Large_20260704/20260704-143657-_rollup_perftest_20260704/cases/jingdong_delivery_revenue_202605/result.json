@@ -1,0 +1,129 @@
+{
+  "case_id": "jingdong_delivery_revenue_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "汇总完成。以下是 2026年5月京东外卖收入的汇总结果：\n\n---\n\n**结论：成功**\n\n| 项目 | 值 |\n|------|-----|\n| 阶段 | preview（试算预览） |\n| 项目 | `jingdong_delivery_revenue`（京东外卖收入） |\n| 期间 | 202605 |\n| 输入 | `input/京东外卖收入/`（4 个源文件，共处理 340,569 行流水） |\n| 产物 | `output/202605_jingdong_delivery_revenue_20260704-152245.xlsx` |\n| 汇总门店数 | **188 行**（按门店聚合） |\n| 字段数 | **6 个**（期间、平台ID、订单原价、餐盒费、商家折扣、商家自送配送费） |\n| 警告 | 无 |\n\n**处理详情：**\n- 大文件（5910249_0）：300,000 行，耗时 386 秒\n- 小文件（5910249_1）：0 行数据\n- 另一门店文件（5910250_0）：40,569 行，耗时 54 秒\n- 环宇城文件：0 行匹配数据\n\n**汇总产物**已生成在 `output/` 目录下，这是门店级基础事实字段的汇总结果，可用于下游收入回款确认阶段。无警告，可直接提交人工复核。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_jingdong_delivery_revenue_20260704-152245.xlsx",
+        "sha256": "8e75455966b1d0085897f77dee53a38ea3aafa4d22e60d338cf383756a9f495b",
+        "size_bytes": 13090
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 188,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "订单原价",
+          "餐盒费",
+          "商家折扣",
+          "商家自送配送费"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_jingdong_delivery_revenue_20260704-152245.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID"
+        ],
+        "period": "202605",
+        "preview_count": 188,
+        "recog_id": "jingdong_delivery_revenue",
+        "sample_differences": [],
+        "target_table_id": "tblRt2KjEUHcEQPZ"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=jingdong_delivery_revenue，period=202605，row_count=188。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-143657-_rollup_perftest_20260704/workspaces/jingdong_delivery_revenu-38e2481e/.workbuddy/skills/revenue-recognition\" && uv run scripts/list_recog_items.py..."
+        ],
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/list_recog_items.py，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "match_count": 2,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-143657-_rollup_perftest_20260704/workspaces/jingdong_delivery_revenu-38e2481e/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py...",
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-143657-_rollup_perftest_20260704/workspaces/jingdong_delivery_revenu-38e2481e/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 1,
+      "summary": "Agent 调用了 scripts/run_recog_rollup.py，匹配次数=2。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-143657-_rollup_perftest_20260704/workspaces/jingdong_delivery_revenu-38e2481e/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --validate，匹配次数=1。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "match_count": 1,
+        "sample_commands": [
+          "cd \"d:/tmp/rere-agent-eval-sandboxes/20260704-143657-_rollup_perftest_20260704/workspaces/jingdong_delivery_revenu-38e2481e/.workbuddy/skills/revenue-recognition\" && uv run scripts/run_recog_rollup.py..."
+        ],
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 1,
+      "summary": "Agent 调用 scripts/run_recog_rollup.py 时携带了 --preview，匹配次数=1。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 560028,
+    "tokens": {
+      "input": 35343,
+      "output": 510,
+      "total": 35853
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 1,
+  "status": "completed",
+  "verdict": "pass"
+}

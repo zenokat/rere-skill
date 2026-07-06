@@ -1,0 +1,125 @@
+{
+  "case_id": "eleme_delivery_revenue_202605",
+  "evidence": {
+    "missing": [],
+    "outputs_path": "outputs/",
+    "session_path": "session.jsonl"
+  },
+  "final_response": "## 饿了么收入汇总 -- 202605\n\n```\n结论：成功\n阶段：preview\n项目：eleme_delivery_revenue（饿了么收入）\n期间：202605\n输入：input/饿了么收入/（15 个门店账单文件）\n产物：output/202605_eleme_delivery_revenue_20260704-151239.xlsx\n      232 行 × 11 字段，0 个警告\n```\n\n### 汇总结果（按门店汇总，232 条记录）\n\n| 字段 | 合计 |\n|---|---|\n| **商品金额** | **8,134,814.12** |\n| 打包费 | 492,477.96 |\n| 商家应收配送费 | 3.50 |\n| 商家活动补贴 | -318,182.45 |\n| 商家代金券补贴 | -982,261.96 |\n| 商家智能补贴 | 0.00 |\n| 智能满减津贴 | 0.00 |\n| 智能特价菜补贴 | 0.00 |\n| 爆单红包增量出资 | 0.00 |\n\n### 说明\n\n- 15 个源文件中，含 1 个大文件（蔡林记总店，131MB，31.6 万行明细）和 14 个门店账单，全部通过校验。\n- 汇总产物已写入 `output/` 目录，可人工复核后上传。\n- 该产物是门店级基础事实字段，不是最终收入确认结果。折后收入、实际回款、平台服务费等最终确认字段属于下游\"收入回款确认\"阶段。",
+  "graders": [
+    {
+      "evidence": {
+        "file": "outputs/202605_eleme_delivery_revenue_20260704-151239.xlsx",
+        "sha256": "35e8c5b476c4875e235bda2877897c0ad94c5065510fa08a459078b17053bcff",
+        "size_bytes": 19352
+      },
+      "id": "preview_file_exists",
+      "score": 1,
+      "summary": "已在 outputs/ 中找到本次 preview 文件。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "baseline_count": 232,
+        "compared_fields": [
+          "期间",
+          "平台ID",
+          "商品金额",
+          "打包费",
+          "商家应收配送费",
+          "商家活动补贴",
+          "商家代金券补贴",
+          "商家智能补贴",
+          "智能满减津贴",
+          "智能特价菜补贴",
+          "爆单红包增量出资"
+        ],
+        "diff_type": "matched",
+        "difference_count": 0,
+        "file": "outputs/202605_eleme_delivery_revenue_20260704-151239.xlsx",
+        "key_fields": [
+          "期间",
+          "平台ID"
+        ],
+        "period": "202605",
+        "preview_count": 232,
+        "recog_id": "eleme_delivery_revenue",
+        "sample_differences": [],
+        "target_table_id": "tbl78CSsQ23uDG0S"
+      },
+      "id": "preview_matches_baseline",
+      "score": 1,
+      "summary": "preview Excel 与影子飞书 baseline 一致；recog_id=eleme_delivery_revenue，period=202605，row_count=232。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "bash_command_count": 7,
+        "match_count": 0,
+        "script_name": "list_recog_items"
+      },
+      "id": "skill_script_called:list_recog_items",
+      "score": 0,
+      "summary": "Agent 未调用 scripts/list_recog_items.py；共检查 7 条 Bash 命令。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "bash_command_count": 7,
+        "match_count": 0,
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_called:run_recog_rollup",
+      "score": 0,
+      "summary": "Agent 未调用 scripts/run_recog_rollup.py；共检查 7 条 Bash 命令。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--validate",
+        "bash_command_count": 7,
+        "match_count": 0,
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--validate",
+      "score": 0,
+      "summary": "Agent 未调用 scripts/run_recog_rollup.py，无法检测参数 --validate。",
+      "type": "code"
+    },
+    {
+      "evidence": {
+        "arg_pattern": "--preview",
+        "bash_command_count": 7,
+        "match_count": 0,
+        "script_name": "run_recog_rollup"
+      },
+      "id": "skill_script_args:run_recog_rollup:--preview",
+      "score": 0,
+      "summary": "Agent 未调用 scripts/run_recog_rollup.py，无法检测参数 --preview。",
+      "type": "code"
+    }
+  ],
+  "metrics": {
+    "cost": {
+      "amount": null,
+      "currency": null
+    },
+    "duration_ms": 683199,
+    "tokens": {
+      "input": 41419,
+      "output": 562,
+      "total": 41981
+    }
+  },
+  "model": {
+    "config": {
+      "fingerprint": "sha256:6fa57920f6cd273e",
+      "source": "suite_config_file"
+    },
+    "observed": "custom-local:deepseek-v4-pro",
+    "requested": "deepseek-v4-pro"
+  },
+  "score": 0,
+  "status": "completed",
+  "verdict": "fail"
+}

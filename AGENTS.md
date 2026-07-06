@@ -1,15 +1,10 @@
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-at specs/002-workbuddy-eval-harness/plan.md
-<!-- SPECKIT END -->
-
 ## 仓库结构
 
 本仓库有两个核心产物：**收入确认 skill**（可交付产品）和 **eval harness**（本地评测框架）。
 
 ```
 eval-harness/         # eval harness 评测框架（本地开发工具，非交付产物）
+├──README.md          # eval-harness使用指南
 ├── cli/              # CLI 入口：run_skill_eval_batch
 ├── evals/            # 核心：bootstrap、runners、graders、sandbox、cases、reports、shared
 └── integrations/     # CodeBuddy CLI 调用集成
@@ -31,6 +26,8 @@ specs/                # 历史设计文档（001-revenue-rollup-cli、002-workbu
 
 两个产物的代码通过 PEP 420 命名空间包（`cli.`、`core.`、`models.`、`integrations.`）共存于同一条 `sys.path`，互不冲突。业务逻辑改 `skill/`，评测框架改 `eval-harness/`。
 
+
+
 ## 沙盒白名单命令审批申请
 查阅 `sandbox-rules-allow-list.md`，把它当作和 `environment.md` 同级的必查文件，而不是"有空再看"的说明页。
 
@@ -45,6 +42,7 @@ specs/                # 历史设计文档（001-revenue-rollup-cli、002-workbu
 4. `sandbox-rules-allow-list.md` 只是申请与审计台账，真正生效入口仍是 `.codex/rules/*.rules`；未经审核，不得自行把命令加入规则文件。
 5. 一次性、明显高风险、带破坏性或边界不清晰的命令，不进入白名单申请流程，继续按单次提权处理。
 6. 当一次任务里既新增了环境记忆，又暴露出高频低风险提权场景时，同时更新 `environment.md` 和 `sandbox-rules-allow-list.md`，不要只更新前者。
+
 
 
 ## 环境记忆
@@ -62,7 +60,7 @@ specs/                # 历史设计文档（001-revenue-rollup-cli、002-workbu
 - 业务规则、字段语义、聚合口径、上传键规则、预处理规则等项目逻辑。
 
 
-### 命令调用方式
+## 命令调用方式
 
 - 本仓库不需要把所有命令都包一层。像 `git`、`rg`、`pytest` 这类标准工具，优先直接调用；
 - 对于需要仓库级 Python 运行环境初始化的自研 CLI，需统一走仓库启动器 `.\.codex\scripts\rere.cmd`。
@@ -74,6 +72,8 @@ specs/                # 历史设计文档（001-revenue-rollup-cli、002-workbu
   `.\.codex\scripts\rere.cmd run_recog_rollup --preview --recog_id <recog_id> --period <period> --source_file <source_file>`
 
   `.\.codex\scripts\rere.cmd run_recog_rollup --upload --append|--upsert --recog_id <recog_id> --result_file <result_file>`
+
+
 
 ## git提交要求
 - 使用中文
@@ -95,6 +95,8 @@ specs/                # 历史设计文档（001-revenue-rollup-cli、002-workbu
   - `[chore]` -- 杂务（.gitignore、依赖更新、CI 配置等）。
   - `[refactor]` -- 重构，行为不变。
 - **分支标签**：已淘汰不再使用，如 `[002-workbuddy-eval-harness]`。
+
+
 
 ## Build for Agents
 项目中构建的skill、eval harness等均视Agent为主要用户（记得你自己就是Agent）

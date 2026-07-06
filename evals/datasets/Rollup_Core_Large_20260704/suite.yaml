@@ -1,0 +1,20 @@
+suite_id: Rollup_Core_Large_20260704
+note: "模拟用户请求所提供信息完善、源文件完备的理想情况，单独考察Agent在5个大源文件确认项目上的表现，期待能正确处理大文件rollup耗时长的情况"
+model:
+  id: deepseek-v4-pro
+  config_file: ${EVAL_MODELS_JSON}
+graders:
+  - "preview_file_exists"
+  - "preview_matches_baseline"
+  - "skill_script_called:list_recog_items"
+  - "skill_script_called:run_recog_rollup"
+  - "skill_script_args:run_recog_rollup:--validate"
+  - "skill_script_args:run_recog_rollup:--preview"
+input: d:/AI/rere-agent/202605-source-excel
+skills: d:/AI/rere-agent/skill
+cases:
+  - eleme_delivery_settlement_202605
+  - meituan_delivery_settlement_202605
+  - eleme_delivery_revenue_202605
+  - jingdong_delivery_revenue_202605
+  - jingdong_delivery_settlement_202605
