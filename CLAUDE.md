@@ -1,1 +1,1 @@
-AGENTS.md
+做任何事情前先加载 `AGENTS.md` 这是仓库使用指引。
