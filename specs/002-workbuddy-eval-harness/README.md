@@ -227,10 +227,18 @@ codex -C D:\AI\rere-agent --sandbox danger-full-access
 使用仓库启动器运行：
 
 ```powershell
+# 临时 smoke 测试 -- 输出到 .tmp/evals/
 .\.codex\scripts\rere.cmd run_skill_eval_batch `
   --suite specs/002-workbuddy-eval-harness/examples/revenue-recognition-real-smoke/suite.yaml `
   --output_root .tmp/evals/revenue-real-smoke
+
+# 正式评测 -- 输出到 evals/results/
+.\.codex\scripts\rere.cmd run_skill_eval_batch `
+  --suite evals/datasets/Rollup_Core_20260630/suite.yaml `
+  --output_root evals/results/Rollup_Core_20260630
 ```
+
+`--output_root` 决定结果输出位置：临时调试和 smoke 测试放 `.tmp/evals/`，正式评测结果统一放 `evals/results/<suite_id>/`。
 
 正式评测建议把模型写在 suite.yaml 的 `model` 字段。`--model <model-id>` 只作为临时覆盖入口；如果 suite 同时声明了 `model.config_file`，覆盖后的模型 ID 也必须存在于该配置文件中。
 

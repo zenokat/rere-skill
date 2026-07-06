@@ -19,6 +19,8 @@ dist/
 Thumbs.db
 .DS_Store
 .tmp/
+evals/results/
 _tmp_source_resolver/
 tests/_**/
 **prompt**.md
+zenotes.md
