@@ -21,9 +21,9 @@ A grader is done only when it has:
 
 Before editing, read the current local patterns:
 
-- `src/evals/graders/preview_file_exists.py` for the simplest grader shape;
+- `eval-harness/evals/graders/preview_file_exists.py` for the simplest grader shape;
 - the newest similar grader, if present, for richer evidence and edge-case handling;
-- `src/evals/runners/batch_runner.py` for grader dispatch and verdict aggregation;
+- `eval-harness/evals/runners/batch_runner.py` for grader dispatch and verdict aggregation;
 - `tests/unit/eval_harness/` for testing style;
 - `specs/002-workbuddy-eval-harness/plan.md` for harness boundaries;
 - `environment.md` when the work touches Feishu, CodeBuddy, PowerShell encoding, Windows paths, temp dirs, or real smoke runs.
@@ -45,7 +45,7 @@ If the grader depends on revenue rollup semantics or preview Excel structure, al
 
 3. Implement the smallest useful grader.
 
-   Put the grader under `src/evals/graders/`. Return a `GraderResult` consistent with existing graders. Prefer deterministic helpers over ad hoc parsing. Include enough evidence to answer: which artifact was checked, which baseline or rule was used, how many records were compared, and what failed.
+   Put the grader under `eval-harness/evals/graders/`. Return a `GraderResult` consistent with existing graders. Prefer deterministic helpers over ad hoc parsing. Include enough evidence to answer: which artifact was checked, which baseline or rule was used, how many records were compared, and what failed.
 
 4. Wire dispatch deliberately.
 

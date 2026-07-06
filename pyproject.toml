@@ -24,7 +24,7 @@ dev = [
 run_skill_eval_batch = "cli.run_skill_eval_batch:main"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = {"" = "eval-harness"}
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["eval-harness"]

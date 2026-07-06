@@ -46,7 +46,7 @@ function Invoke-ProjectCli {
     }
 
     $env:PYTHONIOENCODING = "utf-8"
-    $env:PYTHONPATH = "src"
+    $env:PYTHONPATH = "eval-harness"
 
     Push-Location $RepoRoot
     try {

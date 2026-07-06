@@ -136,4 +136,4 @@ uv run scripts/run_recog_rollup.py --upload --recog_id <recog_id> --result_file 
 
 ## 维护说明
 
-`scripts/lib/` 是本 skill 的业务逻辑源头（结构检验、试算预览、上传、飞书 Bitable 调用、规则引擎）。要修改汇总逻辑，直接改 skill 目录下的 `scripts/lib/`，不要回指开发仓库。开发仓库里的 `src/` 只承载 eval-harness 等本地工具，不再是 skill 业务逻辑的来源。
+`scripts/lib/` 是本 skill 的业务逻辑源头（结构检验、试算预览、上传、飞书 Bitable 调用、规则引擎）。要修改汇总逻辑，直接改 skill 目录下的 `scripts/lib/`，不要回指开发仓库。开发仓库里的 `eval-harness/` 只承载评测框架等本地工具，不再是 skill 业务逻辑的来源。

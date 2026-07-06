@@ -18,7 +18,7 @@ def load_repo_dotenv(repo_root: Path | None = None) -> None:
 
     Args:
         repo_root: Optional repository root. Defaults to the directory three
-            levels above this file (``<repo>/src/evals/shared/env.py``).
+            levels above this file (``<repo>/eval-harness/evals/shared/env.py``).
 
     Returns:
         None. Only ``KEY=VALUE`` lines are processed; comments (``#``) and
@@ -38,7 +38,7 @@ def _default_repo_root() -> Path:
         None.
 
     Returns:
-        Repository root path. ``env.py`` lives in ``<repo>/src/evals/shared/``.
+        Repository root path. ``env.py`` lives in ``<repo>/eval-harness/evals/shared/``.
     """
 
     return Path(__file__).resolve().parents[3]

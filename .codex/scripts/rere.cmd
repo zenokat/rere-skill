@@ -37,7 +37,7 @@ if /I "%ENTRYPOINT%"=="list_recog_items" (
 )
 
 set "PYTHONIOENCODING=utf-8"
-set "PYTHONPATH=%REPO_ROOT%\src"
+set "PYTHONPATH=%REPO_ROOT%\eval-harness"
 
 rem Repository `.env` is loaded by the Python entrypoint itself (see
 rem `evals.shared.env`), so credentials and sandbox root reach the CLI without

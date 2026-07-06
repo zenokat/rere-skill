@@ -15,8 +15,8 @@ import pytest
 _TMP_PATH_COUNTER = itertools.count()
 
 
-def _inject_src_into_sys_path() -> None:
-    """Add `src/`, `tests/` and skill `scripts/lib/` to `sys.path`.
+def _inject_eval_harness_into_sys_path() -> None:
+    """Add `eval-harness/`, `tests/` and skill `scripts/lib/` to `sys.path`.
 
     Args:
         None.
@@ -25,24 +25,24 @@ def _inject_src_into_sys_path() -> None:
         None. The revenue-recognition business logic lives in the deliverable
         skill package (`skill/revenue-recognition/scripts/lib/`); tests import
         it via the same `cli.`/`core.`/`models.`/`utils.` package paths, so the
-        skill lib directory is added here. `src/` is kept for the eval-harness
-        modules that remain there.
+        skill lib directory is added here. `eval-harness/` provides the
+        eval-harness modules (batch runner, graders, sandbox, etc.).
     """
 
     repo_root = Path(__file__).resolve().parents[1]
-    src_path = repo_root / "src"
+    eval_harness_path = repo_root / "eval-harness"
     tests_path = repo_root / "tests"
     skill_lib_path = repo_root / "skill" / "revenue-recognition" / "scripts" / "lib"
 
-    if str(src_path) not in sys.path:
-        sys.path.insert(0, str(src_path))
+    if str(eval_harness_path) not in sys.path:
+        sys.path.insert(0, str(eval_harness_path))
     if str(tests_path) not in sys.path:
         sys.path.insert(0, str(tests_path))
     if str(skill_lib_path) not in sys.path:
         sys.path.insert(0, str(skill_lib_path))
 
 
-_inject_src_into_sys_path()
+_inject_eval_harness_into_sys_path()
 
 
 @pytest.fixture(scope="session")

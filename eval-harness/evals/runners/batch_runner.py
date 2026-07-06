@@ -429,7 +429,7 @@ def _repo_root() -> Path:
 
     Returns:
         Repository root path. ``batch_runner.py`` lives in
-        ``<repo>/src/evals/runners/``, so the repo root is three parents up.
+        ``<repo>/eval-harness/evals/runners/``, so the repo root is three parents up.
     """
 
     return Path(__file__).resolve().parents[3]

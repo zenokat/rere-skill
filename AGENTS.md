@@ -4,6 +4,33 @@ shell commands, and other important information, read the current plan
 at specs/002-workbuddy-eval-harness/plan.md
 <!-- SPECKIT END -->
 
+## 仓库结构
+
+本仓库有两个核心产物：**收入确认 skill**（可交付产品）和 **eval harness**（本地评测框架）。
+
+```
+eval-harness/         # eval harness 评测框架（本地开发工具，非交付产物）
+├── cli/              # CLI 入口：run_skill_eval_batch
+├── evals/            # 核心：bootstrap、runners、graders、sandbox、cases、reports、shared
+└── integrations/     # CodeBuddy CLI 调用集成
+
+skill/                # 可交付 skill 包（独立产品，不依赖本仓库运行）
+└── revenue-recognition/
+    ├── SKILL.md                  # skill 定义与使用说明
+    ├── scripts/                  # skill 可执行脚本
+    │   └── lib/                  # 业务逻辑源码
+    └── references/               # skill 参考文档
+
+evals/                # 评测数据与结果（非代码）
+├── datasets/         # 评测集（suite.yaml + cases）
+└── results/          # 评测运行输出（batch.json、result.json、session.jsonl）
+
+tests/                # 测试
+specs/                # 历史设计文档（001-revenue-rollup-cli、002-workbuddy-eval-harness）
+```
+
+两个产物的代码通过 PEP 420 命名空间包（`cli.`、`core.`、`models.`、`integrations.`）共存于同一条 `sys.path`，互不冲突。业务逻辑改 `skill/`，评测框架改 `eval-harness/`。
+
 ## 沙盒白名单命令审批申请
 查阅 `sandbox-rules-allow-list.md`，把它当作和 `environment.md` 同级的必查文件，而不是"有空再看"的说明页。
 
