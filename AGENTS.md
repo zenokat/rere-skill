@@ -89,6 +89,7 @@ specs/                # 历史设计文档（001-revenue-rollup-cli、002-workbu
   - `[eval]` -- eval-harness 系统迭代 或 日常评测产物（评测集、评测结果）。
   - `[skills]` -- 项目推进过程中沉淀下来的 skill 产出物（SKILL.md、脚本、skill 目录结构），**不是**指项目业务对象（如收入确认 skill）。
   - `[context]` -- 上下文层面的调整（AGENTS.md、CLAUDE.md、environment.md、git 规范等），不涉及记录业务逻辑的speckit文档。
+  - `[recog]` -- 项目revenue-recognition skill产品本身的迭代。
 - **行为标签**：描述改动的性质。
   - `[fix]` -- 修复已有 bug。
   - `[chore]` -- 杂务（.gitignore、依赖更新、CI 配置等）。
